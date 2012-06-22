@@ -161,13 +161,11 @@ static int __scsi_queue_insert(struct scsi_cmnd *cmd, int reason, int unbusy)
 	 */
 	spin_lock_irqsave(q->queue_lock, flags);
 	blk_requeue_request(q, cmd->request);
+	spin_unlock_irqrestore(q->queue_lock, flags);
+
 	kblockd_schedule_work(q, &device->requeue_work);
-<<<<<<< HEAD
 
 	return 0;
-=======
-	spin_unlock_irqrestore(q->queue_lock, flags);
->>>>>>> b485462... [SCSI] Stop accepting SCSI requests before removing a device
 }
 
 /*
