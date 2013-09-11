@@ -2375,11 +2375,16 @@ static int proc_fd_permission(struct inode *inode, int mask)
 
 	rv = generic_permission(inode, mask);
 	if (rv == 0)
+<<<<<<< HEAD
 		return rv;
 
 	rcu_read_lock();
 	p = pid_task(proc_pid(inode), PIDTYPE_PID);
 	if (p && same_thread_group(p, current))
+=======
+		return 0;
+	if (task_tgid(current) == proc_pid(inode))
+>>>>>>> 97d32ff... UPSTREAM: proc: make proc_fd_permission() thread-friendly
 		rv = 0;
 	rcu_read_unlock();
 
