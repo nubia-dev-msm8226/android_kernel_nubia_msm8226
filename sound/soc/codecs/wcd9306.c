@@ -39,7 +39,7 @@
 #include "wcd9xxx-resmgr.h"
 #include "wcd9xxx-common.h"
 
-#define TAPAN_HPH_PA_SETTLE_COMP_ON 3000
+#define TAPAN_HPH_PA_SETTLE_COMP_ON 5000
 #define TAPAN_HPH_PA_SETTLE_COMP_OFF 13000
 
 #define DAPM_MICBIAS2_EXTERNAL_STANDALONE "MIC BIAS2 External Standalone"
