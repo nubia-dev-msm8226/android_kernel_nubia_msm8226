@@ -2853,13 +2853,8 @@ int msm_ipc_router_get_curr_pkt_size(struct msm_ipc_port *port_ptr)
 
 int msm_ipc_router_bind_control_port(struct msm_ipc_port *port_ptr)
 {
-<<<<<<< HEAD
     if (unlikely(!port_ptr || port_ptr->type != CLIENT_PORT))
         return -EINVAL;
-=======
-	if (unlikely(!port_ptr || port_ptr->type != CLIENT_PORT))
-		return -EINVAL;
->>>>>>> 1f1b798... net: ipc_router: Bind only a client port as control port
 
 	down_write(&local_ports_lock_lha2);
 	list_del(&port_ptr->list);
