@@ -13,21 +13,21 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/i2c.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/ctype.h>
 #include <linux/hrtimer.h>
+#include <linux/platform_device.h>
+#include <asm/uaccess.h>
 #include "synaptics_dsx.h"
-#include "synaptics_dsx_i2c.h"
+#include "synaptics_dsx_core.h"
 
 #define WATCHDOG_HRTIMER
 #define WATCHDOG_TIMEOUT_S 2
@@ -45,6 +45,9 @@
 #define DATA_REPORT_INDEX_OFFSET 1
 #define DATA_REPORT_DATA_OFFSET 3
 
+#define SENSOR_RX_MAPPING_OFFSET 1
+#define SENSOR_TX_MAPPING_OFFSET 2
+
 #define COMMAND_GET_REPORT 1
 #define COMMAND_FORCE_CAL 2
 #define COMMAND_FORCE_UPDATE 4
@@ -52,6 +55,19 @@
 #define CONTROL_42_SIZE 2
 #define CONTROL_43_54_SIZE 13
 #define CONTROL_55_56_SIZE 2
+#define CONTROL_58_SIZE 1
+#define CONTROL_59_SIZE 2
+#define CONTROL_60_62_SIZE 3
+#define CONTROL_63_SIZE 1
+#define CONTROL_64_67_SIZE 4
+#define CONTROL_68_73_SIZE 8
+#define CONTROL_74_SIZE 2
+#define CONTROL_76_SIZE 1
+#define CONTROL_77_78_SIZE 2
+#define CONTROL_79_83_SIZE 5
+#define CONTROL_84_85_SIZE 2
+#define CONTROL_86_SIZE 1
+#define CONTROL_87_SIZE 1
 
 #define HIGH_RESISTANCE_DATA_SIZE 6
 #define FULL_RAW_CAP_MIN_MAX_DATA_SIZE 4
@@ -66,6 +82,10 @@
 }
 
 #define attrify(propname) (&dev_attr_##propname.attr)
+
+/*add by lixin for restore result in persist*/
+#define TP_FACTORY_RESULT   "/persist/tp/detect/factory_result"
+/*ZTEMT end*/
 
 #define show_prototype(propname)\
 static ssize_t concat(synaptics_rmi4_f54, _##propname##_show)(\
@@ -85,7 +105,7 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 		const char *buf, size_t count);\
 \
 struct device_attribute dev_attr_##propname =\
-		__ATTR(propname, (S_IWUSR | S_IWGRP)/*S_IWUGO*/,\
+		__ATTR(propname, S_IWUSR | S_IWGRP,\
 		synaptics_rmi4_show_error,\
 		concat(synaptics_rmi4_f54, _##propname##_store));
 
@@ -101,7 +121,7 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 		const char *buf, size_t count);\
 \
 struct device_attribute dev_attr_##propname =\
-		__ATTR(propname, (S_IRUGO | S_IWUSR | S_IWGRP)/*(S_IRUGO | S_IWUGO)*/,\
+		__ATTR(propname, (S_IRUGO | S_IWUSR | S_IWGRP),\
 		concat(synaptics_rmi4_f54, _##propname##_show),\
 		concat(synaptics_rmi4_f54, _##propname##_store));
 
@@ -128,13 +148,13 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_show)(\
 \
 	mutex_lock(&f54->rtype##_mutex);\
 \
-	retval = f54->fn_ptr->read(rmi4_data,\
+	retval = synaptics_rmi4_reg_read(rmi4_data,\
 			f54->rtype.rgrp->address,\
 			f54->rtype.rgrp->data,\
 			sizeof(f54->rtype.rgrp->data));\
 	mutex_unlock(&f54->rtype##_mutex);\
 	if (retval < 0) {\
-		dev_err(&rmi4_data->i2c_client->dev,\
+		dev_err(rmi4_data->pdev->dev.parent,\
 				"%s: Failed to read " #rtype\
 				" " #rgrp "\n",\
 				__func__);\
@@ -163,13 +183,13 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 		return retval;\
 \
 	mutex_lock(&f54->rtype##_mutex);\
-	retval = f54->fn_ptr->read(rmi4_data,\
+	retval = synaptics_rmi4_reg_read(rmi4_data,\
 			f54->rtype.rgrp->address,\
 			f54->rtype.rgrp->data,\
 			sizeof(f54->rtype.rgrp->data));\
 	if (retval < 0) {\
 		mutex_unlock(&f54->rtype##_mutex);\
-		dev_err(&rmi4_data->i2c_client->dev,\
+		dev_err(rmi4_data->pdev->dev.parent,\
 				"%s: Failed to read " #rtype\
 				" " #rgrp "\n",\
 				__func__);\
@@ -184,12 +204,12 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 	o_setting = f54->rtype.rgrp->propname;\
 	f54->rtype.rgrp->propname = setting;\
 \
-	retval = f54->fn_ptr->write(rmi4_data,\
+	retval = synaptics_rmi4_reg_write(rmi4_data,\
 			f54->rtype.rgrp->address,\
 			f54->rtype.rgrp->data,\
 			sizeof(f54->rtype.rgrp->data));\
 	if (retval < 0) {\
-		dev_err(&rmi4_data->i2c_client->dev,\
+		dev_err(rmi4_data->pdev->dev.parent,\
 				"%s: Failed to write " #rtype\
 				" " #rgrp "\n",\
 				__func__);\
@@ -222,13 +242,13 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_show)(\
 \
 	length = f54->rtype.rgrp->length;\
 \
-	retval = f54->fn_ptr->read(rmi4_data,\
+	retval = synaptics_rmi4_reg_read(rmi4_data,\
 			f54->rtype.rgrp->address,\
 			(unsigned char *)f54->rtype.rgrp->data,\
 			length);\
 	mutex_unlock(&f54->rtype##_mutex);\
 	if (retval < 0) {\
-		dev_dbg(&rmi4_data->i2c_client->dev,\
+		dev_dbg(rmi4_data->pdev->dev.parent,\
 				"%s: Failed to read " #rtype\
 				" " #rgrp "\n",\
 				__func__);\
@@ -240,7 +260,7 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_show)(\
 		retval = snprintf(temp, PAGE_SIZE - size, fmt " ",\
 				f54->rtype.rgrp->data[ii].propname);\
 		if (retval < 0) {\
-			dev_err(&rmi4_data->i2c_client->dev,\
+			dev_err(rmi4_data->pdev->dev.parent,\
 					"%s: Faild to write output\n",\
 					__func__);\
 			return retval;\
@@ -251,7 +271,7 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_show)(\
 \
 	retval = snprintf(temp, PAGE_SIZE - size, "\n");\
 	if (retval < 0) {\
-		dev_err(&rmi4_data->i2c_client->dev,\
+		dev_err(rmi4_data->pdev->dev.parent,\
 				"%s: Faild to write null terminator\n",\
 				__func__);\
 		return retval;\
@@ -282,12 +302,12 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 \
 	length = f54->rtype.rgrp->length;\
 \
-	retval = f54->fn_ptr->read(rmi4_data,\
+	retval = synaptics_rmi4_reg_read(rmi4_data,\
 			f54->rtype.rgrp->address,\
 			(unsigned char *)f54->rtype.rgrp->data,\
 			length);\
 	if (retval < 0) {\
-		dev_dbg(&rmi4_data->i2c_client->dev,\
+		dev_dbg(rmi4_data->pdev->dev.parent,\
 				"%s: Failed to read " #rtype\
 				" " #rgrp "\n",\
 				__func__);\
@@ -299,7 +319,7 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 		if (sscanf(temp, fmt, &setting) == 1) {\
 			f54->rtype.rgrp->data[ii].propname = setting;\
 		} else {\
-			retval = f54->fn_ptr->read(rmi4_data,\
+			retval = synaptics_rmi4_reg_read(rmi4_data,\
 					f54->rtype.rgrp->address,\
 					(unsigned char *)f54->rtype.rgrp->data,\
 					length);\
@@ -314,13 +334,13 @@ static ssize_t concat(synaptics_rmi4_f54, _##propname##_store)(\
 		} \
 	} \
 \
-	retval = f54->fn_ptr->write(rmi4_data,\
+	retval = synaptics_rmi4_reg_write(rmi4_data,\
 			f54->rtype.rgrp->address,\
 			(unsigned char *)f54->rtype.rgrp->data,\
 			length);\
 	mutex_unlock(&f54->rtype##_mutex);\
 	if (retval < 0) {\
-		dev_err(&rmi4_data->i2c_client->dev,\
+		dev_err(rmi4_data->pdev->dev.parent,\
 				"%s: Failed to write " #rtype\
 				" " #rgrp "\n",\
 				__func__);\
@@ -418,15 +438,41 @@ struct f54_query {
 			unsigned char has_status:1;
 			unsigned char has_slew_metric:1;
 
-			/* queries 10 11 */
-			unsigned char f54_query10;
-			unsigned char f54_query11;
+			/* query 10 */
+			unsigned char has_h_blank:1;
+			unsigned char has_v_blank:1;
+			unsigned char has_long_h_blank:1;
+			unsigned char has_startup_fast_relaxation:1;
+			unsigned char has_esd_control:1;
+			unsigned char has_noise_mitigation2:1;
+			unsigned char has_noise_state:1;
+			unsigned char has_energy_ratio_relaxation:1;
+
+			/* query 11 */
+			unsigned char has_excessive_noise_reporting:1;
+			unsigned char has_slew_option:1;
+			unsigned char has_two_overhead_bursts:1;
+			unsigned char has_query13:1;
+			unsigned char has_one_overhead_burst:1;
+			unsigned char f54_query11_b5:1;
+			unsigned char has_ctrl88:1;
+			unsigned char has_query15:1;
 
 			/* query 12 */
 			unsigned char number_of_sensing_frequencies:4;
 			unsigned char f54_query12_b4__7:4;
+
+			/* query 13 */
+			unsigned char has_ctrl86:1;
+			unsigned char has_ctrl87:1;
+			unsigned char has_ctrl87_sub0:1;
+			unsigned char has_ctrl87_sub1:1;
+			unsigned char has_ctrl87_sub2:1;
+			unsigned char has_cidim:1;
+			unsigned char has_noise_mitigation_enhancement:1;
+			unsigned char has_rail_im:1;
 		} __packed;
-		unsigned char data[14];
+		unsigned char data[15];
 	};
 };
 
@@ -589,9 +635,9 @@ struct f54_control_12__13 {
 struct f54_control_14 {
 	union {
 		struct {
-				unsigned char rxs_on_xaxis:1;
-				unsigned char curve_comp_on_txs:1;
-				unsigned char f54_ctrl14_b2__7:6;
+			unsigned char rxs_on_xaxis:1;
+			unsigned char curve_comp_on_txs:1;
+			unsigned char f54_ctrl14_b2__7:6;
 		} __packed;
 		struct {
 			unsigned char data[1];
@@ -865,6 +911,25 @@ struct f54_control_57 {
 	};
 };
 
+struct f54_control_88 {
+	union {
+		struct {
+			unsigned char tx_low_reference_polarity:1;
+			unsigned char tx_high_reference_polarity:1;
+			unsigned char abs_low_reference_polarity:1;
+			unsigned char abs_polarity:1;
+			unsigned char cbc_polarity:1;
+			unsigned char cbc_tx_carrier_selection:1;
+			unsigned char charge_pump_enable:1;
+			unsigned char cbc_abs_auto_servo:1;
+		} __packed;
+		struct {
+			unsigned char data[1];
+			unsigned short address;
+		} __packed;
+	};
+};
+
 struct f54_control {
 	struct f54_control_0 *reg_0;
 	struct f54_control_1 *reg_1;
@@ -898,31 +963,7 @@ struct f54_control {
 	struct f54_control_40 *reg_40;
 	struct f54_control_41 *reg_41;
 	struct f54_control_57 *reg_57;
-};
-
-struct f55_query {
-	union {
-		struct {
-			/* query 0 */
-			unsigned char num_of_rx_electrodes;
-
-			/* query 1 */
-			unsigned char num_of_tx_electrodes;
-
-			/* query 2 */
-			unsigned char has_sensor_assignment:1;
-			unsigned char has_edge_compensation:1;
-			unsigned char curve_compensation_mode:2;
-			unsigned char reserved:4;
-		} __packed;
-		unsigned char data[3];
-	};
-};
-
-
-struct synaptics_rmi4_fn55_desc {
-	unsigned short query_base_addr;
-	unsigned short control_base_addr;
+	struct f54_control_88 *reg_88;
 };
 
 struct synaptics_rmi4_f54_handle {
@@ -930,6 +971,8 @@ struct synaptics_rmi4_f54_handle {
 	unsigned char status;
 	unsigned char intr_mask;
 	unsigned char intr_reg_num;
+	unsigned char rx_assigned;
+	unsigned char tx_assigned;
 	unsigned char *report_data;
 	unsigned short query_base_addr;
 	unsigned short control_base_addr;
@@ -949,26 +992,56 @@ struct synaptics_rmi4_f54_handle {
 	struct work_struct timeout_work;
 	struct delayed_work status_work;
 	struct workqueue_struct *status_workqueue;
-	struct synaptics_rmi4_exp_fn_ptr *fn_ptr;
 	struct synaptics_rmi4_data *rmi4_data;
-	struct synaptics_rmi4_fn55_desc *fn55;
+};
+
+struct f55_query {
+	union {
+		struct {
+			/* query 0 */
+			unsigned char num_of_rx_electrodes;
+
+			/* query 1 */
+			unsigned char num_of_tx_electrodes;
+
+			/* query 2 */
+			unsigned char has_sensor_assignment:1;
+			unsigned char has_edge_compensation:1;
+			unsigned char curve_compensation_mode:2;
+			unsigned char has_ctrl6:1;
+			unsigned char has_alternate_transmitter_assignment:1;
+			unsigned char has_single_layer_multi_touch:1;
+			unsigned char has_query5:1;
+		} __packed;
+		unsigned char data[3];
+	};
+};
+
+struct synaptics_rmi4_f55_handle {
+	unsigned char *rx_assignment;
+	unsigned char *tx_assignment;
+	unsigned short query_base_addr;
+	unsigned short control_base_addr;
+	unsigned short data_base_addr;
+	unsigned short command_base_addr;
+	struct f55_query query;
 };
 
 //+++duguowei,2014.116
-store_prototype(factory_start)
 show_prototype(factory_result)
 //---duguowei,2014.116
-store_prototype(reset)
+
 show_prototype(status)
 show_prototype(report_size)
-show_prototype(num_of_mapped_rx)
-show_prototype(num_of_mapped_tx)
 show_store_prototype(no_auto_cal)
 show_store_prototype(report_type)
 show_store_prototype(fifoindex)
 store_prototype(do_preparation)
 store_prototype(get_report)
 store_prototype(force_cal)
+store_prototype(resume_touch)
+show_prototype(num_of_mapped_rx)
+show_prototype(num_of_mapped_tx)
 show_prototype(num_of_rx_electrodes)
 show_prototype(num_of_tx_electrodes)
 show_prototype(has_image16)
@@ -1051,22 +1124,21 @@ static ssize_t synaptics_rmi4_f54_data_read(struct file *data_file,
 		struct kobject *kobj, struct bin_attribute *attributes,
 		char *buf, loff_t pos, size_t count);
 
-static struct attribute *attrs[] = {
-//+++duguowei,2014.116
-	attrify(factory_start),
+static struct attribute *attrs[] = {	
+	//+++duguowei,2014.116
 	attrify(factory_result),
-//---duguowei,2014.116
-	attrify(reset),
+	//---duguowei,2014.116
 	attrify(status),
 	attrify(report_size),
-	attrify(num_of_mapped_rx),
-	attrify(num_of_mapped_tx),
 	attrify(no_auto_cal),
 	attrify(report_type),
 	attrify(fifoindex),
 	attrify(do_preparation),
 	attrify(get_report),
 	attrify(force_cal),
+	attrify(resume_touch),
+	attrify(num_of_mapped_rx),
+	attrify(num_of_mapped_tx),
 	attrify(num_of_rx_electrodes),
 	attrify(num_of_tx_electrodes),
 	attrify(has_image16),
@@ -1293,8 +1365,9 @@ static struct bin_attribute dev_report_data = {
 };
 
 static struct synaptics_rmi4_f54_handle *f54;
+static struct synaptics_rmi4_f55_handle *f55;
 
-static struct completion remove_complete;
+DECLARE_COMPLETION(f54_remove_complete);
 
 static bool is_report_type_valid(enum f54_report_types report_type)
 {
@@ -1331,8 +1404,8 @@ static bool is_report_type_valid(enum f54_report_types report_type)
 static void set_report_size(void)
 {
 	int retval;
-	unsigned char rx = f54->rmi4_data->num_of_rx;
-	unsigned char tx = f54->rmi4_data->num_of_tx;
+	unsigned char rx = f54->rx_assigned;
+	unsigned char tx = f54->tx_assigned;
 	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
 
 	switch (f54->report_type) {
@@ -1375,13 +1448,13 @@ static void set_report_size(void)
 	case F54_ADC_RANGE:
 		if (f54->query.has_signal_clarity) {
 			mutex_lock(&f54->control_mutex);
-			retval = f54->fn_ptr->read(rmi4_data,
+			retval = synaptics_rmi4_reg_read(rmi4_data,
 					f54->control.reg_41->address,
 					f54->control.reg_41->data,
 					sizeof(f54->control.reg_41->data));
 			mutex_unlock(&f54->control_mutex);
 			if (retval < 0) {
-				dev_dbg(&rmi4_data->i2c_client->dev,
+				dev_dbg(rmi4_data->pdev->dev.parent,
 						"%s: Failed to read control reg_41\n",
 						__func__);
 				f54->report_size = 0;
@@ -1419,7 +1492,7 @@ static int set_interrupt(bool set)
 	f01_ctrl_reg = rmi4_data->f01_ctrl_base_addr + 1 + f54->intr_reg_num;
 
 	if (!set) {
-		retval = f54->fn_ptr->write(rmi4_data,
+		retval = synaptics_rmi4_reg_write(rmi4_data,
 				f01_ctrl_reg,
 				&zero,
 				sizeof(zero));
@@ -1431,14 +1504,14 @@ static int set_interrupt(bool set)
 		if (intr_mask[ii] != 0x00) {
 			f01_ctrl_reg = rmi4_data->f01_ctrl_base_addr + 1 + ii;
 			if (set) {
-				retval = f54->fn_ptr->write(rmi4_data,
+				retval = synaptics_rmi4_reg_write(rmi4_data,
 						f01_ctrl_reg,
 						&zero,
 						sizeof(zero));
 				if (retval < 0)
 					return retval;
 			} else {
-				retval = f54->fn_ptr->write(rmi4_data,
+				retval = synaptics_rmi4_reg_write(rmi4_data,
 						f01_ctrl_reg,
 						&(intr_mask[ii]),
 						sizeof(intr_mask[ii]));
@@ -1451,12 +1524,177 @@ static int set_interrupt(bool set)
 	f01_ctrl_reg = rmi4_data->f01_ctrl_base_addr + 1 + f54->intr_reg_num;
 
 	if (set) {
-		retval = f54->fn_ptr->write(rmi4_data,
+		retval = synaptics_rmi4_reg_write(rmi4_data,
 				f01_ctrl_reg,
 				&f54->intr_mask,
 				1);
 		if (retval < 0)
 			return retval;
+	}
+
+	return 0;
+}
+
+static int do_preparation(void)
+{
+	int retval;
+	unsigned char value;
+	unsigned char command;
+	unsigned char timeout_count;
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+
+	mutex_lock(&f54->control_mutex);
+
+	if (f54->query.touch_controller_family == 1) {
+		value = 0;
+		retval = synaptics_rmi4_reg_write(rmi4_data,
+				f54->control.reg_7->address,
+				&value,
+				sizeof(f54->control.reg_7->data));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to disable CBC\n",
+					__func__);
+			mutex_unlock(&f54->control_mutex);
+			return retval;
+		}
+	} else if (f54->query.has_ctrl88 == 1) {
+		retval = synaptics_rmi4_reg_read(rmi4_data,
+				f54->control.reg_88->address,
+				f54->control.reg_88->data,
+				sizeof(f54->control.reg_88->data));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to disable CBC (read ctrl88)\n",
+					__func__);
+			mutex_unlock(&f54->control_mutex);
+			return retval;
+		}
+		f54->control.reg_88->cbc_polarity = 0;
+		f54->control.reg_88->cbc_tx_carrier_selection = 0;
+		retval = synaptics_rmi4_reg_write(rmi4_data,
+				f54->control.reg_88->address,
+				f54->control.reg_88->data,
+				sizeof(f54->control.reg_88->data));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to disable CBC (write ctrl88)\n",
+					__func__);
+			mutex_unlock(&f54->control_mutex);
+			return retval;
+		}
+	}
+
+	if (f54->query.has_0d_acquisition_control) {
+		value = 0;
+		retval = synaptics_rmi4_reg_write(rmi4_data,
+				f54->control.reg_57->address,
+				&value,
+				sizeof(f54->control.reg_57->data));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to disable 0D CBC\n",
+					__func__);
+			mutex_unlock(&f54->control_mutex);
+			return retval;
+		}
+	}
+
+	if (f54->query.has_signal_clarity) {
+		value = 1;
+		retval = synaptics_rmi4_reg_write(rmi4_data,
+				f54->control.reg_41->address,
+				&value,
+				sizeof(f54->control.reg_41->data));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to disable signal clarity\n",
+					__func__);
+			mutex_unlock(&f54->control_mutex);
+			return retval;
+		}
+	}
+
+	mutex_unlock(&f54->control_mutex);
+
+	command = (unsigned char)COMMAND_FORCE_UPDATE;
+
+	retval = synaptics_rmi4_reg_write(rmi4_data,
+			f54->command_base_addr,
+			&command,
+			sizeof(command));
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to write force update command\n",
+				__func__);
+		return retval;
+	}
+
+	timeout_count = 0;
+	do {
+		retval = synaptics_rmi4_reg_read(rmi4_data,
+				f54->command_base_addr,
+				&value,
+				sizeof(value));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to read command register\n",
+					__func__);
+			return retval;
+		}
+
+		if (value == 0x00)
+			break;
+
+		msleep(100);
+		timeout_count++;
+	} while (timeout_count < FORCE_TIMEOUT_100MS);
+
+	if (timeout_count == FORCE_TIMEOUT_100MS) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Timed out waiting for force update\n",
+				__func__);
+		return -ETIMEDOUT;
+	}
+
+	command = (unsigned char)COMMAND_FORCE_CAL;
+
+	retval = synaptics_rmi4_reg_write(rmi4_data,
+			f54->command_base_addr,
+			&command,
+			sizeof(command));
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to write force cal command\n",
+				__func__);
+		return retval;
+	}
+
+	timeout_count = 0;
+	do {
+		retval = synaptics_rmi4_reg_read(rmi4_data,
+				f54->command_base_addr,
+				&value,
+				sizeof(value));
+		if (retval < 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Failed to read command register\n",
+					__func__);
+			return retval;
+		}
+
+		if (value == 0x00)
+			break;
+
+		msleep(100);
+		timeout_count++;
+	} while (timeout_count < FORCE_TIMEOUT_100MS);
+
+	if (timeout_count == FORCE_TIMEOUT_100MS) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Timed out waiting for force cal\n",
+				__func__);
+		return -ETIMEDOUT;
 	}
 
 	return 0;
@@ -1471,20 +1709,18 @@ static void timeout_set_status(struct work_struct *work)
 
 	mutex_lock(&f54->status_mutex);
 	if (f54->status == STATUS_BUSY) {
-		retval = f54->fn_ptr->read(rmi4_data,
+		retval = synaptics_rmi4_reg_read(rmi4_data,
 				f54->command_base_addr,
 				&command,
 				sizeof(command));
 		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Failed to read command register\n",
 					__func__);
-			f54->status = -ETIMEDOUT;
 		} else if (command & COMMAND_GET_REPORT) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Report type not supported by FW\n",
 					__func__);
-			f54->status = -ETIMEDOUT;
 		} else {
 			queue_delayed_work(f54->status_workqueue,
 					&f54->status_work,
@@ -1559,8 +1795,8 @@ static void print_image_report(void)
 
 		report_data = (short *)f54->report_data;
 
-		for (ii = 0; ii < f54->rmi4_data->num_of_tx; ii++) {
-			for (jj = 0; jj < f54->rmi4_data->num_of_rx; jj++) {
+		for (ii = 0; ii < f54->tx_assigned; ii++) {
+			for (jj = 0; jj < f54->rx_assigned; jj++) {
 				if (*report_data < -64)
 					pr_cont(".");
 				else if (*report_data < 0)
@@ -1622,6 +1858,7 @@ static void free_control_mem(void)
 	kfree(control.reg_39);
 	kfree(control.reg_40);
 	kfree(control.reg_41);
+	kfree(control.reg_57);
 
 	return;
 }
@@ -1642,211 +1879,6 @@ static void remove_sysfs(void)
 	return;
 }
 
-//+++duguowei,2014.116
-static ssize_t synaptics_rmi4_f54_factory_start_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int reset;
-	printk("[factory_start]factory_start...\n");
-	if (sscanf(buf, "%u", &reset) != 1)
-		return -EINVAL;
-
-	if (reset != 1)
-		return -EINVAL;
-	
-	return count;
-}
-
-static ssize_t synaptics_rmi4_f54_factory_result_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	int retval = 0;
-	unsigned char data;
-	unsigned long setting = F54_RAW_16BIT_IMAGE;
-	unsigned char command = (unsigned char)COMMAND_GET_REPORT;
-	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-	short report_data;
-	int patience = 4;
-	unsigned int ii;
-	short LOWER_CAPACITY = 250;
-	short UPPER_CAPACITY = 5500;
-
-//reset
-	printk("[factory_result]reset...\n");
-	mutex_lock(&f54->status_mutex);
-	retval = rmi4_data->reset_device(rmi4_data);
-	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to issue reset command, error = %d\n",
-				__func__, retval);
-		mutex_unlock(&f54->status_mutex);
-		goto exit_1;
-	}
-	f54->status = STATUS_IDLE;
-	mutex_unlock(&f54->status_mutex);
-//report_type
-	printk("[factory_result]report_type...\n");
-	if (!is_report_type_valid((enum f54_report_types)setting)) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Report type not supported by driver\n",
-				__func__);
-		retval = -EINVAL;
-		goto exit_1;
-	}
-	mutex_lock(&f54->status_mutex);
-	if (f54->status != STATUS_BUSY) {
-		f54->report_type = (enum f54_report_types)setting;
-		data = (unsigned char)setting;
-		retval = f54->fn_ptr->write(rmi4_data,
-				f54->data_base_addr,
-				&data,
-				sizeof(data));
-		mutex_unlock(&f54->status_mutex);
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to write data register\n",
-					__func__);
-			goto exit_1;
-		}
-		
-	} else {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Previous get report still ongoing\n",
-				__func__);
-		mutex_unlock(&f54->status_mutex);
-		retval = -EINVAL;
-		goto exit_1;
-	}
-//get_report
-	//before get_report,status must be idle 0
-	//after get_report,status must be busy 1
-	printk("[factory_result]get_report...\n");
-	if (!is_report_type_valid(f54->report_type)) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Invalid report type\n",
-					__func__);
-			
-		retval = -EINVAL;
-		goto exit_1;
-	}
-	
-	mutex_lock(&f54->status_mutex);
-	if (f54->status != STATUS_IDLE) {
-		if (f54->status != STATUS_BUSY) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Invalid status (%d)\n",
-					__func__, f54->status);
-		} else {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Previous get report still ongoing\n",
-					__func__);
-		}
-		mutex_unlock(&f54->status_mutex);
-		retval = -EBUSY;
-		goto exit_1;
-	}
-	
-	set_interrupt(true);
-	
-	f54->status = STATUS_BUSY;
-	
-	retval = f54->fn_ptr->write(rmi4_data,
-				f54->command_base_addr,
-				&command,
-				sizeof(command));
-	mutex_unlock(&f54->status_mutex);
-	if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to write get report command\n",
-					__func__);
-		goto exit_1;
-		}
-	
-#ifdef WATCHDOG_HRTIMER
-		hrtimer_start(&f54->watchdog,
-				ktime_set(WATCHDOG_TIMEOUT_S, 0),
-				HRTIMER_MODE_REL);
-#endif
-
-//get_status
-	do{
-		msleep(1000);
-		if(f54->status == STATUS_IDLE)
-			break;
-	}while(--patience > 0);
-	printk("[factory_result]get_status...%d\n",f54->status);
-//read
-	printk("[factory_result]read...\n");
-	switch (f54->report_type) {
-	case F54_RAW_16BIT_IMAGE:
-		if((f54->report_size == 0) || (f54->report_data == NULL)){
-			printk("[factory_result]read,size is null...\n");
-			retval = -EINVAL;
-			goto exit_1;
-		}
-		for (ii = 0; ii < f54->report_size; ii += 2) {
-			report_data = f54->report_data[ii] | (f54->report_data[ii + 1] << 8);
-			printk("[factory_result]read,capacity is %d\n",report_data);
-			if(report_data < LOWER_CAPACITY || report_data > UPPER_CAPACITY){
-				printk("[factory_result]read,capacity is wrong...%d\n",report_data);
-				retval = -EINVAL;
-				goto exit_1;
-			}
-		}
-		retval = 0;
-		break;
-		default:
-			printk("[factory_result]test type error...type=%d\n",f54->report_type);
-	}
-#ifdef RAW_HEX
-		print_raw_hex_report();
-#endif
-	
-#ifdef HUMAN_READABLE
-		print_image_report();
-#endif
-
-exit_1:
-	printk("[factory_result] retval = %d\n",retval);
-	//snprintf(buf, PAGE_SIZE, "%u\n", retval<0?0:1);//0:four bytes;(char)0:one byte
-	return snprintf(buf, PAGE_SIZE, "%u\n", (char)(retval<0?0:1));
-}
-
-
-//---duguowei,2014.116
-static ssize_t synaptics_rmi4_f54_reset_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	int retval;
-	unsigned int reset;
-	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-
-	if (sscanf(buf, "%u", &reset) != 1)
-		return -EINVAL;
-
-	if (reset != 1)
-		return -EINVAL;
-
-	mutex_lock(&f54->status_mutex);
-
-	retval = rmi4_data->reset_device(rmi4_data);
-	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to issue reset command, error = %d\n",
-				__func__, retval);
-	//+++ duguowei,2014.116
-	mutex_unlock(&f54->status_mutex);
-	//--- duguowei,2014.116
-		return retval;
-	}
-
-	f54->status = STATUS_IDLE;
-
-	mutex_unlock(&f54->status_mutex);
-
-	return count;
-}
-
 static ssize_t synaptics_rmi4_f54_status_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1857,18 +1889,6 @@ static ssize_t synaptics_rmi4_f54_report_size_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%u\n", f54->report_size);
-}
-
-static ssize_t synaptics_rmi4_f54_num_of_mapped_rx_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%u\n", f54->rmi4_data->num_of_rx);
-}
-
-static ssize_t synaptics_rmi4_f54_num_of_mapped_tx_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%u\n", f54->rmi4_data->num_of_tx);
 }
 
 static ssize_t synaptics_rmi4_f54_no_auto_cal_show(struct device *dev,
@@ -1892,12 +1912,12 @@ static ssize_t synaptics_rmi4_f54_no_auto_cal_store(struct device *dev,
 	if (setting > 1)
 		return -EINVAL;
 
-	retval = f54->fn_ptr->read(rmi4_data,
+	retval = synaptics_rmi4_reg_read(rmi4_data,
 			f54->control_base_addr,
 			&data,
 			sizeof(data));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read control register\n",
 				__func__);
 		return retval;
@@ -1908,12 +1928,12 @@ static ssize_t synaptics_rmi4_f54_no_auto_cal_store(struct device *dev,
 
 	data = (data & ~NO_AUTO_CAL_MASK) | (data & NO_AUTO_CAL_MASK);
 
-	retval = f54->fn_ptr->write(rmi4_data,
+	retval = synaptics_rmi4_reg_write(rmi4_data,
 			f54->control_base_addr,
 			&data,
 			sizeof(data));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to write control register\n",
 				__func__);
 		return retval;
@@ -1943,7 +1963,7 @@ static ssize_t synaptics_rmi4_f54_report_type_store(struct device *dev,
 		return retval;
 
 	if (!is_report_type_valid((enum f54_report_types)setting)) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Report type not supported by driver\n",
 				__func__);
 		return -EINVAL;
@@ -1954,20 +1974,20 @@ static ssize_t synaptics_rmi4_f54_report_type_store(struct device *dev,
 	if (f54->status != STATUS_BUSY) {
 		f54->report_type = (enum f54_report_types)setting;
 		data = (unsigned char)setting;
-		retval = f54->fn_ptr->write(rmi4_data,
+		retval = synaptics_rmi4_reg_write(rmi4_data,
 				f54->data_base_addr,
 				&data,
 				sizeof(data));
 		mutex_unlock(&f54->status_mutex);
 		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Failed to write data register\n",
 					__func__);
 			return retval;
 		}
 		return count;
 	} else {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Previous get report still ongoing\n",
 				__func__);
 		mutex_unlock(&f54->status_mutex);
@@ -1982,12 +2002,12 @@ static ssize_t synaptics_rmi4_f54_fifoindex_show(struct device *dev,
 	unsigned char data[2];
 	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
 
-	retval = f54->fn_ptr->read(rmi4_data,
+	retval = synaptics_rmi4_reg_read(rmi4_data,
 			f54->data_base_addr + DATA_REPORT_INDEX_OFFSET,
 			data,
 			sizeof(data));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read data registers\n",
 				__func__);
 		return retval;
@@ -2013,12 +2033,12 @@ static ssize_t synaptics_rmi4_f54_fifoindex_store(struct device *dev,
 
 	hstoba(data, (unsigned short)setting);
 
-	retval = f54->fn_ptr->write(rmi4_data,
+	retval = synaptics_rmi4_reg_write(rmi4_data,
 			f54->data_base_addr + DATA_REPORT_INDEX_OFFSET,
 			data,
 			sizeof(data));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to write data registers\n",
 				__func__);
 		return retval;
@@ -2031,9 +2051,6 @@ static ssize_t synaptics_rmi4_f54_do_preparation_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	int retval;
-	unsigned char value;
-	unsigned char command;
-	unsigned char timeout_count;
 	unsigned long setting;
 	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
 
@@ -2048,11 +2065,11 @@ static ssize_t synaptics_rmi4_f54_do_preparation_store(struct device *dev,
 
 	if (f54->status != STATUS_IDLE) {
 		if (f54->status != STATUS_BUSY) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Invalid status (%d)\n",
 					__func__, f54->status);
 		} else {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Previous get report still ongoing\n",
 					__func__);
 		}
@@ -2062,126 +2079,12 @@ static ssize_t synaptics_rmi4_f54_do_preparation_store(struct device *dev,
 
 	mutex_unlock(&f54->status_mutex);
 
-	if (f54->query.touch_controller_family == 1) {
-		value = 0;
-		retval = f54->fn_ptr->write(rmi4_data,
-				f54->control.reg_7->address,
-				&value,
-				sizeof(f54->control.reg_7->data));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to disable CBC\n",
-					__func__);
-			return retval;
-		}
-	}
-
-	if (f54->query.has_0d_acquisition_control) {
-		value = 0;
-		retval = f54->fn_ptr->write(rmi4_data,
-				f54->control.reg_57->address,
-				&value,
-				sizeof(f54->control.reg_57->data));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to disable 0D CBC\n",
-					__func__);
-			return retval;
-		}
-	}
-
-	if (f54->query.has_signal_clarity) {
-		value = 1;
-		retval = f54->fn_ptr->write(rmi4_data,
-				f54->control.reg_41->address,
-				&value,
-				sizeof(f54->control.reg_41->data));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to disable signal clarity\n",
-					__func__);
-			return retval;
-		}
-	}
-
-	command = (unsigned char)COMMAND_FORCE_UPDATE;
-
-	retval = f54->fn_ptr->write(rmi4_data,
-			f54->command_base_addr,
-			&command,
-			sizeof(command));
+	retval = do_preparation();
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to write force update command\n",
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to do preparation\n",
 				__func__);
 		return retval;
-	}
-
-	timeout_count = 0;
-	do {
-		retval = f54->fn_ptr->read(rmi4_data,
-				f54->command_base_addr,
-				&value,
-				sizeof(value));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to read command register\n",
-					__func__);
-			return retval;
-		}
-
-		if (value == 0x00)
-			break;
-
-		msleep(100);
-		timeout_count++;
-	} while (timeout_count < FORCE_TIMEOUT_100MS);
-
-	if (timeout_count == FORCE_TIMEOUT_100MS) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Timed out waiting for force update\n",
-				__func__);
-		return -ETIMEDOUT;
-	}
-
-	command = (unsigned char)COMMAND_FORCE_CAL;
-
-	retval = f54->fn_ptr->write(rmi4_data,
-			f54->command_base_addr,
-			&command,
-			sizeof(command));
-	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to write force cal command\n",
-				__func__);
-		return retval;
-	}
-
-	timeout_count = 0;
-	do {
-		retval = f54->fn_ptr->read(rmi4_data,
-				f54->command_base_addr,
-				&value,
-				sizeof(value));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to read command register\n",
-					__func__);
-			return retval;
-		}
-
-		if (value == 0x00)
-			break;
-
-		msleep(100);
-		timeout_count++;
-	} while (timeout_count < FORCE_TIMEOUT_100MS);
-
-	if (timeout_count == FORCE_TIMEOUT_100MS) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Timed out waiting for force cal\n",
-				__func__);
-		return -ETIMEDOUT;
 	}
 
 	return count;
@@ -2205,7 +2108,7 @@ static ssize_t synaptics_rmi4_f54_get_report_store(struct device *dev,
 	command = (unsigned char)COMMAND_GET_REPORT;
 
 	if (!is_report_type_valid(f54->report_type)) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Invalid report type\n",
 				__func__);
 		return -EINVAL;
@@ -2215,11 +2118,11 @@ static ssize_t synaptics_rmi4_f54_get_report_store(struct device *dev,
 
 	if (f54->status != STATUS_IDLE) {
 		if (f54->status != STATUS_BUSY) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Invalid status (%d)\n",
 					__func__, f54->status);
 		} else {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Previous get report still ongoing\n",
 					__func__);
 		}
@@ -2231,13 +2134,13 @@ static ssize_t synaptics_rmi4_f54_get_report_store(struct device *dev,
 
 	f54->status = STATUS_BUSY;
 
-	retval = f54->fn_ptr->write(rmi4_data,
+	retval = synaptics_rmi4_reg_write(rmi4_data,
 			f54->command_base_addr,
 			&command,
 			sizeof(command));
 	mutex_unlock(&f54->status_mutex);
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to write get report command\n",
 				__func__);
 		return retval;
@@ -2265,25 +2168,55 @@ static ssize_t synaptics_rmi4_f54_force_cal_store(struct device *dev,
 		return retval;
 
 	if (setting != 1)
-		return count;
+		return -EINVAL;
 
 	command = (unsigned char)COMMAND_FORCE_CAL;
 
 	if (f54->status == STATUS_BUSY)
 		return -EBUSY;
 
-	retval = f54->fn_ptr->write(rmi4_data,
+	retval = synaptics_rmi4_reg_write(rmi4_data,
 			f54->command_base_addr,
 			&command,
 			sizeof(command));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to write force cal command\n",
 				__func__);
 		return retval;
 	}
 
 	return count;
+}
+
+static ssize_t synaptics_rmi4_f54_resume_touch_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned long setting;
+
+	retval = sstrtoul(buf, 10, &setting);
+	if (retval)
+		return retval;
+
+	if (setting != 1)
+		return -EINVAL;
+
+	set_interrupt(false);
+
+	return count;
+}
+
+static ssize_t synaptics_rmi4_f54_num_of_mapped_rx_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", f54->rx_assigned);
+}
+
+static ssize_t synaptics_rmi4_f54_num_of_mapped_tx_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", f54->tx_assigned);
 }
 
 simple_show_func_unsigned(query, num_of_rx_electrodes)
@@ -2376,22 +2309,22 @@ static ssize_t synaptics_rmi4_f54_burst_count_show(struct device *dev,
 
 	mutex_lock(&f54->control_mutex);
 
-	retval = f54->fn_ptr->read(rmi4_data,
+	retval = synaptics_rmi4_reg_read(rmi4_data,
 			f54->control.reg_17->address,
 			(unsigned char *)f54->control.reg_17->data,
 			f54->control.reg_17->length);
 	if (retval < 0) {
-		dev_dbg(&rmi4_data->i2c_client->dev,
+		dev_dbg(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read control reg_17\n",
 				__func__);
 	}
 
-	retval = f54->fn_ptr->read(rmi4_data,
+	retval = synaptics_rmi4_reg_read(rmi4_data,
 			f54->control.reg_18->address,
 			(unsigned char *)f54->control.reg_18->data,
 			f54->control.reg_18->length);
 	if (retval < 0) {
-		dev_dbg(&rmi4_data->i2c_client->dev,
+		dev_dbg(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read control reg_18\n",
 				__func__);
 	}
@@ -2405,7 +2338,7 @@ static ssize_t synaptics_rmi4_f54_burst_count_show(struct device *dev,
 			f54->control.reg_17->data[ii].burst_count_b8__10 +
 			f54->control.reg_18->data[ii].burst_count_b0__7);
 		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Faild to write output\n",
 					__func__);
 			return retval;
@@ -2416,7 +2349,7 @@ static ssize_t synaptics_rmi4_f54_burst_count_show(struct device *dev,
 
 	retval = snprintf(temp, PAGE_SIZE - size, "\n");
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Faild to write null terminator\n",
 				__func__);
 		return retval;
@@ -2434,7 +2367,7 @@ static ssize_t synaptics_rmi4_f54_data_read(struct file *data_file,
 	mutex_lock(&f54->data_mutex);
 
 	if (count < f54->report_size) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Report type %d data size (%d) too large\n",
 				__func__, f54->report_type, f54->report_size);
 		mutex_unlock(&f54->data_mutex);
@@ -2446,7 +2379,7 @@ static ssize_t synaptics_rmi4_f54_data_read(struct file *data_file,
 		mutex_unlock(&f54->data_mutex);
 		return f54->report_size;
 	} else {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Report type %d data not available\n",
 				__func__, f54->report_type);
 		mutex_unlock(&f54->data_mutex);
@@ -2463,15 +2396,15 @@ static int synaptics_rmi4_f54_set_sysfs(void)
 	f54->attr_dir = kobject_create_and_add("f54",
 			&rmi4_data->input_dev->dev.kobj);
 	if (!f54->attr_dir) {
-		dev_err(&rmi4_data->i2c_client->dev,
-			"%s: Failed to create sysfs directory\n",
-			__func__);
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to create sysfs directory\n",
+				__func__);
 		goto exit_1;
 	}
 
 	retval = sysfs_create_bin_file(f54->attr_dir, &dev_report_data);
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to create sysfs bin file\n",
 				__func__);
 		goto exit_2;
@@ -2479,7 +2412,7 @@ static int synaptics_rmi4_f54_set_sysfs(void)
 
 	retval = sysfs_create_group(f54->attr_dir, &attr_group);
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to create sysfs attributes\n",
 				__func__);
 		goto exit_3;
@@ -2490,7 +2423,7 @@ static int synaptics_rmi4_f54_set_sysfs(void)
 			retval = sysfs_create_group(f54->attr_dir,
 					&attrs_ctrl_regs[reg_num]);
 			if (retval < 0) {
-				dev_err(&rmi4_data->i2c_client->dev,
+				dev_err(rmi4_data->pdev->dev.parent,
 						"%s: Failed to create sysfs attributes\n",
 						__func__);
 				goto exit_4;
@@ -2956,100 +2889,91 @@ static int synaptics_rmi4_f54_set_ctrl(void)
 	}
 	reg_num++;
 
+	/* control 58 */
+	if (f54->query.has_0d_acquisition_control == 1)
+		reg_addr += CONTROL_58_SIZE;
+
+	/* control 59 */
+	if (f54->query.has_h_blank == 1)
+		reg_addr += CONTROL_59_SIZE;
+
+	/* controls 60 61 62 */
+	if ((f54->query.has_h_blank == 1) ||
+			(f54->query.has_v_blank == 1) ||
+			(f54->query.has_long_h_blank == 1))
+		reg_addr += CONTROL_60_62_SIZE;
+
+	/* control 63 */
+	if ((f54->query.has_h_blank == 1) ||
+			(f54->query.has_v_blank == 1) ||
+			(f54->query.has_long_h_blank == 1) ||
+			(f54->query.has_slew_metric == 1) ||
+			(f54->query.has_slew_option == 1) ||
+			(f54->query.has_noise_mitigation2 == 1))
+		reg_addr += CONTROL_63_SIZE;
+
+	/* controls 64 65 66 67 */
+	if (f54->query.has_h_blank == 1)
+		reg_addr += CONTROL_64_67_SIZE * 7;
+	else if ((f54->query.has_v_blank == 1) ||
+			(f54->query.has_long_h_blank == 1))
+		reg_addr += CONTROL_64_67_SIZE;
+
+	/* controls 68 69 70 71 72 73 */
+	if ((f54->query.has_h_blank == 1) ||
+			(f54->query.has_v_blank == 1) ||
+			(f54->query.has_long_h_blank == 1))
+		reg_addr += CONTROL_68_73_SIZE;
+
+	/* control 74 */
+	if (f54->query.has_slew_metric == 1)
+		reg_addr += CONTROL_74_SIZE;
+
+	/* control 75 */
+	if (f54->query.has_enhanced_stretch == 1)
+		reg_addr += num_of_sensing_freqs;
+
+	/* control 76 */
+	if (f54->query.has_startup_fast_relaxation == 1)
+		reg_addr += CONTROL_76_SIZE;
+
+	/* controls 77 78 */
+	if (f54->query.has_esd_control == 1)
+		reg_addr += CONTROL_77_78_SIZE;
+
+	/* controls 79 80 81 82 83 */
+	if (f54->query.has_noise_mitigation2 == 1)
+		reg_addr += CONTROL_79_83_SIZE;
+
+	/* controls 84 85 */
+	if (f54->query.has_energy_ratio_relaxation == 1)
+		reg_addr += CONTROL_84_85_SIZE;
+
+	/* control 86 */
+	if ((f54->query.has_query13 == 1) && (f54->query.has_ctrl86 == 1))
+		reg_addr += CONTROL_86_SIZE;
+
+	/* control 87 */
+	if ((f54->query.has_query13 == 1) && (f54->query.has_ctrl87 == 1))
+		reg_addr += CONTROL_87_SIZE;
+
+	/* control 88 */
+	if (f54->query.has_ctrl88 == 1) {
+		control->reg_88 = kzalloc(sizeof(*(control->reg_88)),
+				GFP_KERNEL);
+		if (!control->reg_88)
+			goto exit_no_mem;
+		control->reg_88->address = reg_addr;
+		reg_addr += sizeof(control->reg_88->data);
+	}
+
 	return 0;
 
 exit_no_mem:
-	dev_err(&rmi4_data->i2c_client->dev,
+	dev_err(rmi4_data->pdev->dev.parent,
 			"%s: Failed to alloc mem for control registers\n",
 			__func__);
 	return -ENOMEM;
-}
-
-static void synaptics_rmi4_f54_sensor_mapping(void)
-{
-	int retval;
-	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
-	struct f54_control *control = &f54->control;
-	unsigned int rx_len;
-	unsigned int tx_len;
-	unsigned char *buffer;
-	unsigned char *rx_buffer;
-	unsigned char *tx_buffer;
-	struct f55_query query;
-	unsigned short offset;
-	int i;
-
-	rmi4_data->num_of_rx = 0;
-	rmi4_data->num_of_tx = 0;
-
-	if (f54->query.has_sensor_assignment == 1) {
-		rx_len = control->reg_15->length;
-		tx_len = control->reg_16->length;
-		offset = control->reg_15->address;
-
-	} else if (f54->fn55) {
-		retval = f54->fn_ptr->read(rmi4_data,
-				f54->fn55->query_base_addr,
-				query.data,
-				sizeof(query.data));
-		if (retval < 0) {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Failed to read query registers\n",
-					__func__);
-			return;
-		}
-
-		if (query.has_sensor_assignment) {
-			rx_len = query.num_of_rx_electrodes;
-			tx_len = query.num_of_tx_electrodes;
-
-			offset = f54->fn55->control_base_addr + 1;
-		} else {
-			dev_err(&rmi4_data->i2c_client->dev,
-					"%s: Has sensor assignment is not set in F55\n",
-					__func__);
-			return;
-		}
-	} else {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Cannot find sensor mapping\n",
-				__func__);
-		return;
-	}
-
-	buffer = kzalloc((rx_len +  tx_len) * sizeof(unsigned char),
-				GFP_KERNEL);
-
-	retval = f54->fn_ptr->read(rmi4_data, offset, buffer, rx_len + tx_len);
-	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to read control registers\n",
-				__func__);
-		goto exit;
-	}
-	rx_buffer = buffer;
-	tx_buffer = buffer + rx_len;
-
-	for (i = 0; i < rx_len; i++) {
-		if (rx_buffer[i] != 0xFF)
-			rmi4_data->num_of_rx++;
-	}
-	for (i = 0; i < tx_len; i++) {
-		if (tx_buffer[i] != 0xFF)
-			rmi4_data->num_of_tx++;
-	}
-
-	dev_info(&rmi4_data->i2c_client->dev,
-				"RxTx mapped from F$%s\n" \
-				"\n\tRx mapped count %d(%d)\n\tTx \
-				mapped count %d(%d)\n\n",
-				f54->fn55 ? "55" : "54",
-				rmi4_data->num_of_rx,
-				rx_len,
-				rmi4_data->num_of_tx,
-				tx_len);
-exit:
-	kfree(buffer);
 }
 
 static void synaptics_rmi4_f54_status_work(struct work_struct *work)
@@ -3063,7 +2987,7 @@ static void synaptics_rmi4_f54_status_work(struct work_struct *work)
 
 	set_report_size();
 	if (f54->report_size == 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Report data size = 0\n",
 				__func__);
 		retval = -EINVAL;
@@ -3076,7 +3000,7 @@ static void synaptics_rmi4_f54_status_work(struct work_struct *work)
 			kfree(f54->report_data);
 		f54->report_data = kzalloc(f54->report_size, GFP_KERNEL);
 		if (!f54->report_data) {
-			dev_err(&rmi4_data->i2c_client->dev,
+			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Failed to alloc mem for data buffer\n",
 					__func__);
 			f54->data_buffer_size = 0;
@@ -3091,24 +3015,24 @@ static void synaptics_rmi4_f54_status_work(struct work_struct *work)
 	report_index[0] = 0;
 	report_index[1] = 0;
 
-	retval = f54->fn_ptr->write(rmi4_data,
+	retval = synaptics_rmi4_reg_write(rmi4_data,
 			f54->data_base_addr + DATA_REPORT_INDEX_OFFSET,
 			report_index,
 			sizeof(report_index));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to write report data index\n",
 				__func__);
 		retval = -EINVAL;
 		goto error_exit;
 	}
 
-	retval = f54->fn_ptr->read(rmi4_data,
+	retval = synaptics_rmi4_reg_read(rmi4_data,
 			f54->data_base_addr + DATA_REPORT_DATA_OFFSET,
 			f54->report_data,
 			f54->report_size);
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read report data\n",
 				__func__);
 		retval = -EINVAL;
@@ -3127,9 +3051,369 @@ static void synaptics_rmi4_f54_status_work(struct work_struct *work)
 
 error_exit:
 	mutex_lock(&f54->status_mutex);
-	set_interrupt(false);
 	f54->status = retval;
 	mutex_unlock(&f54->status_mutex);
+
+	return;
+}
+
+static void synaptics_rmi4_f54_set_regs(struct synaptics_rmi4_data *rmi4_data,
+		struct synaptics_rmi4_fn_desc *fd,
+		unsigned int intr_count,
+		unsigned char page)
+{
+	unsigned char ii;
+	unsigned char intr_offset;
+
+	f54->query_base_addr = fd->query_base_addr | (page << 8);
+	f54->control_base_addr = fd->ctrl_base_addr | (page << 8);
+	f54->data_base_addr = fd->data_base_addr | (page << 8);
+	f54->command_base_addr = fd->cmd_base_addr | (page << 8);
+
+	f54->intr_reg_num = (intr_count + 7) / 8;
+	if (f54->intr_reg_num != 0)
+		f54->intr_reg_num -= 1;
+
+	f54->intr_mask = 0;
+	intr_offset = intr_count % 8;
+	for (ii = intr_offset;
+			ii < ((fd->intr_src_count & MASK_3BIT) +
+			intr_offset);
+			ii++) {
+		f54->intr_mask |= 1 << ii;
+	}
+
+	return;
+}
+
+
+/*add by lixin for restore result in persist*/
+static int tp_write_cal_file(char *file_path,unsigned int value)
+{
+    struct file *file_p;
+    char write_buf[10];
+	 mm_segment_t old_fs; 
+    int vfs_write_retval=0;
+    if (NULL==file_path)
+    {
+        printk("file_path is NULL\n");  
+    }
+    memset(write_buf, 0, sizeof(write_buf));
+    sprintf(write_buf, "%d\n", value);
+    file_p = filp_open(file_path, O_CREAT|O_RDWR , 0665);
+    if (IS_ERR(file_p))
+    {
+        printk("[open file <%s>failed]\n",file_path);
+        goto error;
+    }
+    old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    
+    vfs_write_retval = vfs_write(file_p, (char*)write_buf, sizeof(write_buf), &file_p->f_pos);
+    if (vfs_write_retval < 0)
+    {
+        printk("[write file <%s>failed]\n",file_path);
+        goto error;
+    }
+
+    set_fs(old_fs);
+    filp_close(file_p, NULL);
+
+
+    return 1;
+
+error:
+    return -1;
+}
+
+
+static int tp_read_cal_value(char *file_path)
+{
+    struct file *file_p;
+    int vfs_read_retval = 0;
+    mm_segment_t old_fs; 
+    char read_buf[32];
+    unsigned short read_value;
+
+    if (NULL==file_path)
+    {
+        printk("file_path is NULL\n");
+        goto error;
+    }
+
+    memset(read_buf, 0, 32);
+
+    file_p = filp_open(file_path, O_RDONLY , 0665);
+    if (IS_ERR(file_p))
+       {
+           printk("[open file <%s>failed,creat it ]\n",file_path);
+           file_p = filp_open(file_path, O_CREAT|O_RDONLY , 0665);
+           if (IS_ERR(file_p))
+            {
+                printk("[open file <%s>failed too ]\n",file_path);
+                goto error;
+            }
+       }
+
+    old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    
+    vfs_read_retval = vfs_read(file_p, (char*)read_buf, 16, &file_p->f_pos);
+    if (vfs_read_retval < 0)
+    {
+        printk("[read file <%s>failed]\n",file_path);
+        goto error;
+    }
+
+    set_fs(old_fs);
+    filp_close(file_p, NULL);
+
+    if (kstrtou16(read_buf, 10, &read_value) < 0)
+    {
+        printk("[kstrtou16 %s failed]\n",read_buf);
+        goto error;
+    }
+    
+    printk("[the content of %s is %s]\n", file_path, read_buf);
+
+    return read_value;
+
+error:
+    return -1;
+}
+
+
+/*ZTEMT end*/
+
+
+
+
+/*luochangyang for factory_result 2014/04/05*/
+static int _synaptics_rmi4_f54_factory_result_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+//	unsigned long setting = F54_RAW_16BIT_IMAGE;
+	unsigned int ii;
+	int retval = 0;
+	int patience = 10000;
+//	unsigned char command = (unsigned char)COMMAND_GET_REPORT;
+	short report_data;
+	short LOWER_CAPACITY = 1400; //250
+	short UPPER_CAPACITY = 4800; //5500
+	
+	struct synaptics_rmi4_data *rmi4_data = f54->rmi4_data;
+
+	/* before get_report, status must be idle 0
+	    after   get_report, status must be busy 1*/
+
+	/*1. reset*/
+	#if 0
+	dev_info(rmi4_data->pdev->dev.parent, "%s: reset...\n", __func__);
+	retval = rmi4_data->reset_device(rmi4_data);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to issue reset command, error = %d\n",
+				__func__, retval);
+		goto exit_1;
+	}
+	f54->status = STATUS_IDLE;
+	#endif
+	
+	/*2. set report type*/
+	dev_info(rmi4_data->pdev->dev.parent, "%s: set report type...\n", __func__);
+	retval = synaptics_rmi4_f54_report_type_store(dev, attr, "3", 2);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to set report type\n",
+				__func__);
+		retval = -EINVAL;
+		goto exit_1;
+	}
+
+	/*3. get report*/
+	dev_info(rmi4_data->pdev->dev.parent, "%s: get report type...\n", __func__);
+	retval = synaptics_rmi4_f54_get_report_store(dev, attr, "1", 2);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to get report type\n",
+				__func__);
+		retval = -EINVAL;
+		goto exit_1;
+	}
+
+	/*4. get status*/
+	dev_info(rmi4_data->pdev->dev.parent, "%s: get status...\n", __func__);
+	do{
+		if(f54->status == STATUS_IDLE){
+            dev_info(rmi4_data->pdev->dev.parent, "%s:get status == STATUS_IDLE\n", __func__);
+			break;
+          }
+	}while(--patience > 0);   
+    printk("[factory_result]get_status...%d\n",f54->status);
+
+	/*5. read, compare*/
+	dev_info(rmi4_data->pdev->dev.parent, "%s: read...\n", __func__);
+
+	switch (f54->report_type) {
+	case F54_RAW_16BIT_IMAGE:
+                if (f54->report_size == 0) {
+                    dev_err(rmi4_data->pdev->dev.parent,
+                            "%s: ERROR: report_size == 0 \n\n",
+                            __func__);
+                    retval = -EINVAL;
+                    goto exit_1;
+                 }
+                printk("[factory_result] f54->report_size = %d.\n", f54->report_size);
+            
+                if (f54->report_data == NULL) {
+                    dev_err(rmi4_data->pdev->dev.parent,
+                            "%s: ERROR: f54->report_data == NULL \n",
+                            __func__);
+			retval = -EINVAL;
+			goto exit_1;
+		}
+            for (ii = 0; ii < ((f54->report_size)-60); ii += 2) {
+                report_data = f54->report_data[ii] | (f54->report_data[ii + 1] << 8);
+               // printk("[factory_result]read,capacity %03d is %d\n", ii / 2, report_data);
+                if((ii/2)%27 < 24){
+                    if(report_data < LOWER_CAPACITY || report_data > UPPER_CAPACITY){
+                                        printk("[factory_result]read,capacity %03d is wrong...%d\n", ii / 2, report_data);
+                                        retval = -EINVAL;
+                                        goto exit_1;
+                       }
+                }else{
+                    //printk("[factory_result]read,capacity %03d is %d\n", ii / 2, report_data);
+                }
+            }
+		retval = 0;
+		break;
+		default:
+			printk("[factory_result]test type error...type=%d\n",f54->report_type);
+            break;
+	}
+	
+#ifdef RAW_HEX
+		print_raw_hex_report();
+#endif
+	
+#ifdef HUMAN_READABLE
+		print_image_report();
+#endif
+
+exit_1:
+    synaptics_rmi4_f54_resume_touch_store(dev, attr, "1", 2);
+    printk("[factory_result 0] retval = %d\n",retval);
+    return retval;
+    //snprintf(buf, PAGE_SIZE, "%u\n", retval<0?0:1);//0:four bytes;(char)0:one byte
+	//return snprintf(buf, PAGE_SIZE, "%u\n", (char)(retval == 0? 0:1));
+}
+/*luochangyang END*/
+
+/*lixin for factory_result 2014/06/05*/
+static ssize_t synaptics_rmi4_f54_factory_result_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int retval = 0;
+    int err = 0;
+	retval = _synaptics_rmi4_f54_factory_result_show(dev, attr, buf);
+    msleep(2500);
+    retval = _synaptics_rmi4_f54_factory_result_show(dev, attr, buf);
+	printk("[factory_result 1] retval = %d\n",retval);
+	//snprintf(buf, PAGE_SIZE, "%u\n", retval<0?0:1);//0:four bytes;(char)0:one byte
+
+    /*add by lixin for restore result in persist*/
+    if((tp_read_cal_value(TP_FACTORY_RESULT))!=7)
+        {
+            printk("TP_FACTORY_RESULT != 7\n");
+            err=tp_write_cal_file(TP_FACTORY_RESULT,7);
+            if(err<0)
+                {
+                    printk("ERROR=%s\n",TP_FACTORY_RESULT);
+                }
+        }
+    /*ZTEMT end*/
+    
+    return snprintf(buf, PAGE_SIZE, "%u\n", (char)(retval == 0? 0:1));
+}
+/*luochangyang END*/
+
+static void synaptics_rmi5_f55_init(struct synaptics_rmi4_data *rmi4_data)
+{
+	int retval;
+	unsigned char ii;
+	unsigned char rx_electrodes = f54->query.num_of_rx_electrodes;
+	unsigned char tx_electrodes = f54->query.num_of_tx_electrodes;
+
+	retval = synaptics_rmi4_reg_read(rmi4_data,
+			f55->query_base_addr,
+			f55->query.data,
+			sizeof(f55->query.data));
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to read f55 query registers\n",
+				__func__);
+		return;
+	}
+
+	if (!f55->query.has_sensor_assignment)
+		return;
+
+	f55->rx_assignment = kzalloc(rx_electrodes, GFP_KERNEL);
+	f55->tx_assignment = kzalloc(tx_electrodes, GFP_KERNEL);
+
+	retval = synaptics_rmi4_reg_read(rmi4_data,
+			f55->control_base_addr + SENSOR_RX_MAPPING_OFFSET,
+			f55->rx_assignment,
+			rx_electrodes);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to read f55 rx assignment\n",
+				__func__);
+		return;
+	}
+
+	retval = synaptics_rmi4_reg_read(rmi4_data,
+			f55->control_base_addr + SENSOR_TX_MAPPING_OFFSET,
+			f55->tx_assignment,
+			tx_electrodes);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to read f55 tx assignment\n",
+				__func__);
+		return;
+	}
+
+	f54->rx_assigned = 0;
+	for (ii = 0; ii < rx_electrodes; ii++) {
+		if (f55->rx_assignment[ii] != 0xff)
+			f54->rx_assigned++;
+	}
+
+	f54->tx_assigned = 0;
+	for (ii = 0; ii < tx_electrodes; ii++) {
+		if (f55->tx_assignment[ii] != 0xff)
+			f54->tx_assigned++;
+	}
+
+	return;
+}
+
+static void synaptics_rmi4_f55_set_regs(struct synaptics_rmi4_data *rmi4_data,
+		struct synaptics_rmi4_fn_desc *fd,
+		unsigned char page)
+{
+	f55 = kzalloc(sizeof(*f55), GFP_KERNEL);
+	if (!f55) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to alloc mem for f55\n",
+				__func__);
+		return;
+	}
+
+	f55->query_base_addr = fd->query_base_addr | (page << 8);
+	f55->control_base_addr = fd->ctrl_base_addr | (page << 8);
+	f55->data_base_addr = fd->data_base_addr | (page << 8);
+	f55->command_base_addr = fd->cmd_base_addr | (page << 8);
 
 	return;
 }
@@ -3137,6 +3421,9 @@ error_exit:
 static void synaptics_rmi4_f54_attn(struct synaptics_rmi4_data *rmi4_data,
 		unsigned char intr_mask)
 {
+	if (!f54)
+		return;
+
 	if (f54->intr_mask & intr_mask) {
 		queue_delayed_work(f54->status_workqueue,
 				&f54->status_work,
@@ -3149,120 +3436,92 @@ static void synaptics_rmi4_f54_attn(struct synaptics_rmi4_data *rmi4_data,
 static int synaptics_rmi4_f54_init(struct synaptics_rmi4_data *rmi4_data)
 {
 	int retval;
-	bool hasF54 = false;
-	bool hasF55 = false;
-	unsigned short ii;
+	unsigned short addr;
 	unsigned char page;
 	unsigned char intr_count = 0;
-	unsigned char intr_offset;
-
+	bool f54found = false;
+	bool f55found = false;
 	struct synaptics_rmi4_fn_desc rmi_fd;
 
 	f54 = kzalloc(sizeof(*f54), GFP_KERNEL);
 	if (!f54) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to alloc mem for f54\n",
 				__func__);
 		retval = -ENOMEM;
 		goto exit;
 	}
 
-	f54->fn_ptr = kzalloc(sizeof(*(f54->fn_ptr)), GFP_KERNEL);
-	if (!f54->fn_ptr) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to alloc mem for fn_ptr\n",
-				__func__);
-		retval = -ENOMEM;
-		goto exit_free_f54;
-	}
-
 	f54->rmi4_data = rmi4_data;
-	f54->fn_ptr->read = rmi4_data->i2c_read;
-	f54->fn_ptr->write = rmi4_data->i2c_write;
-	f54->fn_ptr->enable = rmi4_data->irq_enable;
 
 	for (page = 0; page < PAGES_TO_SERVICE; page++) {
-		for (ii = PDT_START; ii > PDT_END; ii -= PDT_ENTRY_SIZE) {
-			ii |= (page << 8);
+		for (addr = PDT_START; addr > PDT_END; addr -= PDT_ENTRY_SIZE) {
+			addr |= (page << 8);
 
-			retval = f54->fn_ptr->read(rmi4_data,
-					ii,
+			retval = synaptics_rmi4_reg_read(rmi4_data,
+					addr,
 					(unsigned char *)&rmi_fd,
 					sizeof(rmi_fd));
 			if (retval < 0)
 				goto exit_free_mem;
 
+			addr &= ~(MASK_8BIT << 8);
+
 			if (!rmi_fd.fn_number)
 				break;
 
-			if (rmi_fd.fn_number == SYNAPTICS_RMI4_F54) {
-				hasF54 = true;
-				f54->query_base_addr =
-					rmi_fd.query_base_addr | (page << 8);
-				f54->control_base_addr =
-					rmi_fd.ctrl_base_addr | (page << 8);
-				f54->data_base_addr =
-					rmi_fd.data_base_addr | (page << 8);
-				f54->command_base_addr =
-					rmi_fd.cmd_base_addr | (page << 8);
-			} else if (rmi_fd.fn_number == SYNAPTICS_RMI4_F55) {
-				hasF55 = true;
-				f54->fn55 = kzalloc(sizeof(*f54->fn55),
-								GFP_KERNEL);
-				f54->fn55->query_base_addr =
-					rmi_fd.query_base_addr | (page << 8);
-				f54->fn55->control_base_addr =
-					rmi_fd.ctrl_base_addr | (page << 8);
+			switch (rmi_fd.fn_number) {
+			case SYNAPTICS_RMI4_F54:
+				synaptics_rmi4_f54_set_regs(rmi4_data,
+						&rmi_fd, intr_count, page);
+				f54found = true;
+				break;
+			case SYNAPTICS_RMI4_F55:
+				synaptics_rmi4_f55_set_regs(rmi4_data,
+						&rmi_fd, page);
+				f55found = true;
+				break;
+			default:
+				break;
 			}
 
-			if (hasF54 && hasF55)
-				goto found;
+			if (f54found && f55found)
+				goto pdt_done;
 
-			if (!hasF54)
-				intr_count +=
-					(rmi_fd.intr_src_count & MASK_3BIT);
+			intr_count += (rmi_fd.intr_src_count & MASK_3BIT);
 		}
 	}
 
-	if (!hasF54) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: F$54 is not available\n",
-				__func__);
-		goto exit;
-	}
-found:
-	f54->intr_reg_num = (intr_count + 7) / 8;
-	if (f54->intr_reg_num != 0)
-		f54->intr_reg_num -= 1;
-
-	f54->intr_mask = 0;
-	intr_offset = intr_count % 8;
-	for (ii = intr_offset;
-			ii < ((rmi_fd.intr_src_count & MASK_3BIT) +
-			intr_offset);
-			ii++) {
-		f54->intr_mask |= 1 << ii;
+	if (!f54found) {
+		retval = -ENODEV;
+		goto exit_free_mem;
 	}
 
-	retval = f54->fn_ptr->read(rmi4_data,
+pdt_done:
+	retval = synaptics_rmi4_reg_read(rmi4_data,
 			f54->query_base_addr,
 			f54->query.data,
 			sizeof(f54->query.data));
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to read query registers\n",
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to read f54 query registers\n",
 				__func__);
 		goto exit_free_mem;
 	}
 
+	f54->rx_assigned = f54->query.num_of_rx_electrodes;
+	f54->tx_assigned = f54->query.num_of_tx_electrodes;
+
 	retval = synaptics_rmi4_f54_set_ctrl();
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
-				"%s: Failed to set up control registers\n",
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to set up f54 control registers\n",
 				__func__);
 		goto exit_free_control;
 	}
-	synaptics_rmi4_f54_sensor_mapping();
+
+	if (f55found)
+		synaptics_rmi5_f55_init(rmi4_data);
 
 	mutex_init(&f54->status_mutex);
 	mutex_init(&f54->data_mutex);
@@ -3270,7 +3529,7 @@ found:
 
 	retval = synaptics_rmi4_f54_set_sysfs();
 	if (retval < 0) {
-		dev_err(&rmi4_data->i2c_client->dev,
+		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to create sysfs entries\n",
 				__func__);
 		goto exit_sysfs;
@@ -3289,19 +3548,22 @@ found:
 	/* Work function to do actual cleaning up */
 	INIT_WORK(&f54->timeout_work, timeout_set_status);
 #endif
-	init_completion(&remove_complete);
+
+	f54->status = STATUS_IDLE;
 
 	return 0;
 
 exit_sysfs:
+	kfree(f55->rx_assignment);
+	kfree(f55->tx_assignment);
+
 exit_free_control:
 	free_control_mem();
 
 exit_free_mem:
-	kfree(f54->fn_ptr);
-
-exit_free_f54:
+	kfree(f55);
 	kfree(f54);
+	f54 = NULL;
 
 exit:
 	return retval;
@@ -3309,6 +3571,9 @@ exit:
 
 static void synaptics_rmi4_f54_remove(struct synaptics_rmi4_data *rmi4_data)
 {
+	if (!f54)
+		goto exit;
+
 #ifdef WATCHDOG_HRTIMER
 	hrtimer_cancel(&f54->watchdog);
 #endif
@@ -3319,37 +3584,62 @@ static void synaptics_rmi4_f54_remove(struct synaptics_rmi4_data *rmi4_data)
 
 	remove_sysfs();
 
+	kfree(f55->rx_assignment);
+	kfree(f55->tx_assignment);
+
 	free_control_mem();
+
+	kfree(f55);
 
 	if (f54->data_buffer_size)
 		kfree(f54->report_data);
-	kfree(f54->fn55);
-	kfree(f54->fn_ptr);
-	kfree(f54);
 
-	complete(&remove_complete);
+	kfree(f54);
+	f54 = NULL;
+
+exit:
+	complete(&f54_remove_complete);
 
 	return;
 }
 
+static void synaptics_rmi4_f54_reset(struct synaptics_rmi4_data *rmi4_data)
+{
+	if (!f54)
+		return;
+
+	synaptics_rmi4_f54_remove(rmi4_data);
+	synaptics_rmi4_f54_init(rmi4_data);
+
+	return;
+}
+
+static struct synaptics_rmi4_exp_fn f54_module = {
+	.fn_type = RMI_F54,
+	.init = synaptics_rmi4_f54_init,
+	.remove = synaptics_rmi4_f54_remove,
+	.reset = synaptics_rmi4_f54_reset,
+	.reinit = NULL,
+	.early_suspend = NULL,
+	.suspend = NULL,
+	.resume = NULL,
+	.late_resume = NULL,
+	.attn = synaptics_rmi4_f54_attn,
+};
+
 static int __init rmi4_f54_module_init(void)
 {
-	synaptics_rmi4_new_function(RMI_F54, true,
-			synaptics_rmi4_f54_init,
-			synaptics_rmi4_f54_remove,
-			synaptics_rmi4_f54_attn);
+	synaptics_rmi4_new_function(&f54_module, true);
 
 	return 0;
 }
 
 static void __exit rmi4_f54_module_exit(void)
 {
-	synaptics_rmi4_new_function(RMI_F54, false,
-			synaptics_rmi4_f54_init,
-			synaptics_rmi4_f54_remove,
-			synaptics_rmi4_f54_attn);
+	synaptics_rmi4_new_function(&f54_module, false);
 
-	wait_for_completion(&remove_complete);
+	wait_for_completion(&f54_remove_complete);
+
 	return;
 }
 
