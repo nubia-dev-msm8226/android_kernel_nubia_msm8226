@@ -41,7 +41,11 @@ import subprocess
 
 allowed_warnings = set([
     "return_address.c:62",
+<<<<<<< HEAD
     "hci_conn.c:407",
+=======
+    "workqueue.c:480",
+>>>>>>> 36ddce7... ARM: msm: GCC Version change.
  ])
 
 # Capture the name of the object file, can find it.
