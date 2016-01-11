@@ -2714,7 +2714,11 @@ long tty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case TIOCGSID:
 		return tiocgsid(tty, real_tty, p);
 	case TIOCGETD:
+<<<<<<< HEAD
 		 return tiocgetd(tty, p);
+=======
+		return tiocgetd(tty, p);
+>>>>>>> 7c1fd8b... tty: Fix unsafe ldisc reference via ioctl(TIOCGETD)
 	case TIOCSETD:
 		return tiocsetd(tty, p);
 	case TIOCVHANGUP:
