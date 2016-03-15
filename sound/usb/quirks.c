@@ -170,7 +170,10 @@ static int create_fixed_stream_quirk(struct snd_usb_audio *chip,
 	return 0;
 
  error:
+<<<<<<< HEAD
 	list_del(&fp->list); /* unlink for avoiding double-free */
+=======
+>>>>>>> d4c979b... ALSA: usb-audio: Minor code cleanup in create_fixed_stream_quirk()
 	kfree(fp);
 	kfree(rate_table);
 	return err;
