@@ -20,7 +20,7 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/gpio.h>
-#include <ztemt_hw_version.h>
+#include "ztemt_hw_version.h"
 
 
 //#define CONFIG_ZTEMT_HW_VERSION_DEBUG

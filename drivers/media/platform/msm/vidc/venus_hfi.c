@@ -2130,12 +2130,6 @@ static void venus_hfi_core_clear_interrupt(struct venus_hfi_device *device)
 	u32 intr_status = 0;
 	int rc = 0;
 
-	if (!device) {
-		dprintk(VIDC_ERR, "%s Invalid paramter: %pK\n",
-			__func__, device);
-		return;
-	}
-
 	if (!device->callback)
 		return;
 
@@ -2481,7 +2475,6 @@ static int venus_hfi_session_clean(void *session)
 		return -EINVAL;
 	}
 	sess_close = session;
-	device = sess_close->device;
 	dprintk(VIDC_DBG, "deleted the session: 0x%pK",
 			sess_close);
 	mutex_lock(&((struct venus_hfi_device *)
