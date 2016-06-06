@@ -68,6 +68,11 @@
 #include <linux/shmem_fs.h>
 #include <linux/slab.h>
 #include <linux/perf_event.h>
+<<<<<<< HEAD
+=======
+#include <linux/random.h>
+#include <linux/sched_clock.h>
+>>>>>>> 9451e32... update Rel V9
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -553,6 +558,7 @@ asmlinkage void __init start_kernel(void)
 	softirq_init();
 	timekeeping_init();
 	time_init();
+	sched_clock_postinit();
 	profile_init();
 	call_function_init();
 	if (!irqs_disabled())
