@@ -39,8 +39,7 @@
 #include  "../../include/linux/printk.h"
 
 static bool AW9106B_SUSPEND_FLAG=false; 
-//#define GPIO_PWDN 28
-#define GPIO_PWDN 15
+#define GPIO_PWDN 28
 #define DELAY_256MS_UNIT 1
 #define AW_DRIVER_NAME "aw9106bdrv"
 #define DRV_NAME "class/leds/red/outn"
@@ -1041,6 +1040,9 @@ static ssize_t set_outn(struct device *dev,
 	sscanf(buf, "%d", &outn);
 	AW_DBG("outn= %d \n",outn);
 
+#ifdef CONFIG_ZTEMT_BREATH_LED_NX503A
+    if(outn==16)outn=8;
+#endif
 	return count;
 }
 //path: sys/class/leds/red/
