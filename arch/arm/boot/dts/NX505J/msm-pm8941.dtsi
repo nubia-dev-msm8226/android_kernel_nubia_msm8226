@@ -64,7 +64,7 @@
 			qcom,s2-type = <1>;
 			linux,code = <116>;
 		};
-
+/* Removed by yfliu, for PWK
 		qcom,pon_2 {
 			qcom,pon-type = <1>;
 			qcom,support-reset = <1>;
@@ -74,7 +74,7 @@
 			qcom,s2-type = <1>;
 			linux,code = <114>;
 			qcom,use-bark;
-		};
+		};*/
 
 		qcom,pon_3 {
 			qcom,pon-type = <3>;
@@ -124,7 +124,7 @@
 
 		qcom,r-sense-uohm = <10000>;
 		qcom,v-cutoff-uv = <3400000>;
-		qcom,max-voltage-uv = <4200000>;
+		qcom,max-voltage-uv = <4350000>;  //ZTEMT_CHARGE 4200000 --> 4350000
 		qcom,r-conn-mohm = <0>;
 		qcom,shutdown-soc-valid-limit = <100>;
 		qcom,adjust-soc-low-threshold = <15>;
@@ -135,7 +135,7 @@
 		qcom,low-soc-calculate-soc-ms = <5000>;
 		qcom,calculate-soc-ms = <20000>;
 		qcom,chg-term-ua = <100000>;
-		qcom,batt-type = <0>;
+		qcom,batt-type = <3>;  //ZTEMT_CHARGE  0 --> 3 OEM battery type
 		qcom,low-voltage-threshold = <3420000>;
 		qcom,tm-temp-margin = <5000>;
 		qcom,low-ocv-correction-limit-uv = <100>;
@@ -200,26 +200,30 @@
 		#size-cells = <1>;
 		status = "disabled";
 
-		qcom,vddmax-mv = <4200>;
-		qcom,vddsafe-mv = <4230>;
-		qcom,vinmin-mv = <4300>;
+		qcom,vddmax-mv = <4350>; //ZTEMT_CHARGE  4200 --> 4350
+		qcom,vddsafe-mv = <4380>;  //ZTEMT_CHARGE  4230 --> 4380
+		qcom,vinmin-mv = <4400>;  //ZTEMT_CHARGE  4300 --> 4400
 		qcom,ibatmax-ma = <1500>;
 		qcom,ibatterm-ma = <100>;
 		qcom,ibatsafe-ma = <1500>;
 		qcom,thermal-mitigation = <1500 700 600 325>;
-		qcom,cool-bat-decidegc = <100>;
+		qcom,cool-bat-decidegc = <0>; //ZTEMT_CHARGE 100 --> 0
 		qcom,cool-bat-mv = <4100>;
 		qcom,ibatmax-warm-ma = <350>;
-		qcom,warm-bat-decidegc = <450>;
+		qcom,warm-bat-decidegc = <0>; //ZTEMT_CHARGE 450 --> 0
 		qcom,warm-bat-mv = <4100>;
 		qcom,ibatmax-cool-ma = <350>;
-		qcom,vbatdet-delta-mv = <100>;
+		qcom,vbatdet-delta-mv = <50>;  //ZTEMT_CHARGE 100 --> 50
 		qcom,resume-soc = <99>;
 		qcom,tchg-mins = <150>;
 		qcom,chg-vadc = <&pm8941_vadc>;
 		qcom,chg-iadc = <&pm8941_iadc>;
 		qcom,chg-adc_tm = <&pm8941_adc_tm>;
 		qcom,ibat-calibration-enabled;
+        //ZTEMT_CHARGE add 
+		qcom,batt-hot-percentage = <25>;
+		qcom,batt-cold-percentage = <80>;
+		//ZTEMT end
 
 		pm8941_chg_chgr: qcom,chgr@1000 {
 			status = "disabled";
@@ -1243,15 +1247,24 @@
 		compatible = "qcom,qpnp-vibrator";
 		reg = <0xc000 0x100>;
 		label = "vibrator";
-		status = "disabled";
+		qcom,vib-vtg-level-mV = <3000>;
+		status = "ok";
 	};
 
+/*
 	qcom,leds@d000 {
 		compatible = "qcom,leds-qpnp";
 		reg = <0xd000 0x100>;
 		label = "rgb";
 	};
-
+*/
+/*****modify by ttwang for rgb breath leds********/ 
+	qcom,leds@d000 {
+		compatible = "qcom,ztemt-leds-qpnp";
+		reg = <0xd000 0x100>;
+		label = "rgb";
+	};
+	
 	qcom,leds@d100 {
 		compatible = "qcom,leds-qpnp";
 		reg = <0xd100 0x100>;
