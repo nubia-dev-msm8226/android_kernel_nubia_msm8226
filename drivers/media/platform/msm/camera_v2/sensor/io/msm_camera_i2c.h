@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
-=======
 /* Copyright (c) 2011-2014,2016 The Linux Foundation. All rights reserved.
->>>>>>> 9e3463dd... msm: camera: Restructure data handling to be more robust
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
