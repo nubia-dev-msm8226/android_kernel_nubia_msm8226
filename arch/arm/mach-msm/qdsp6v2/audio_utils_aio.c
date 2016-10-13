@@ -1,6 +1,6 @@
 /* Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
- * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2014,2016 The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -581,6 +581,8 @@ int audio_aio_release(struct inode *inode, struct file *file)
 	mutex_unlock(&audio->write_lock);
 	mutex_unlock(&audio->read_lock);
 	mutex_unlock(&audio->lock);
+	mutex_unlock(&audio->write_lock);
+	mutex_unlock(&audio->read_lock);
 	mutex_destroy(&audio->lock);
 	mutex_destroy(&audio->read_lock);
 	mutex_destroy(&audio->write_lock);
@@ -1353,7 +1355,11 @@ long audio_aio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_lock(&audio->lock);
 		if (copy_from_user(&info, (void *)arg, sizeof(info)))
 			rc = -EFAULT;
+<<<<<<< HEAD
 		else {
+=======
+		else{
+>>>>>>> 75bc2d9... ASoC: msm: lock read/write when add/free audio ion memory
 			mutex_lock(&audio->read_lock);
 			mutex_lock(&audio->write_lock);
 			rc = audio_aio_ion_add(audio, &info);
@@ -1369,12 +1375,21 @@ long audio_aio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		pr_debug("%s[%p]:AUDIO_DEREGISTER_ION\n", __func__, audio);
 		if (copy_from_user(&info, (void *)arg, sizeof(info)))
 			rc = -EFAULT;
+<<<<<<< HEAD
 		else {
 			mutex_lock(&audio->read_lock);
 			mutex_lock(&audio->write_lock);
 			rc = audio_aio_ion_remove(audio, &info);
 			mutex_unlock(&audio->write_lock);
 			mutex_unlock(&audio->read_lock);
+=======
+		else{
+                        mutex_lock(&audio->read_lock);
+                        mutex_lock(&audio->write_lock);
+			rc = audio_aio_ion_remove(audio, &info);
+                        mutex_unlock(&audio->write_lock);
+                        mutex_unlock(&audio->read_lock);
+>>>>>>> 75bc2d9... ASoC: msm: lock read/write when add/free audio ion memory
 		}
 		mutex_unlock(&audio->lock);
 		break;
