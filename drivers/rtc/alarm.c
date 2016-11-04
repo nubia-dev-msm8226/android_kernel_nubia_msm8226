@@ -25,7 +25,11 @@
 
 #include <asm/mach/time.h>
 
+<<<<<<< HEAD
 #define ALARM_DELTA 180
+=======
+#define ALARM_DELTA 120
+>>>>>>> f2e839a... update to rel V15
 #define ANDROID_ALARM_PRINT_ERROR (1U << 0)
 #define ANDROID_ALARM_PRINT_INIT_STATUS (1U << 1)
 #define ANDROID_ALARM_PRINT_TSET (1U << 2)
