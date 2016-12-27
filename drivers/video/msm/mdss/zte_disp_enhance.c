@@ -168,14 +168,82 @@ void zte_mipi_disp_inc(unsigned int state)
 #if defined(CONFIG_ZTEMT_NE501_LCD)
   zte_NE501J_disp_inc(state);
 #endif
+<<<<<<< HEAD
+=======
+
+	return;
+
+	switch (value) {
+	case INTENSITY_00:
+		zte_send_cmd(&display_soft_cmd,ZTE_SHARP_ENHANCE_CMD_COUNT);
+		break;
+	case INTENSITY_01:
+		zte_send_cmd(&display_std_cmd,ZTE_SHARP_ENHANCE_CMD_COUNT);
+		break;
+	case INTENSITY_02:
+		zte_send_cmd(&display_glow_cmd,ZTE_SHARP_ENHANCE_CMD_COUNT);
+		break;
+	default:
+		zte_send_cmd(&display_std_cmd,ZTE_SHARP_ENHANCE_CMD_COUNT);
+		break;
+	}
+>>>>>>> 126142f... update to relV16
 }
 
 void zte_disp_enhance(void)
 {
   zte_mipi_disp_inc(zte_intensity_value);
 }
+<<<<<<< HEAD
 static ssize_t intensity_show(struct kobject *kobj, struct kobj_attribute *attr,
    char *buf)
+=======
+
+
+void zte_mipi_colortmp(void)
+{
+	unsigned int value;
+	value =zte_enhance_val.colortmp;
+
+	if(!zte_enhance_val.en_colortmp || (NULL == zte_mdss_dsi_ctrl))
+		return ;
+	
+#if ZTE_DISP_ENHANCE_DEBUG
+	printk("lcd:%s value=%d\n", __func__, value);
+#endif
+
+	return;
+
+	switch (value) {
+	case INTENSITY_00:
+		zte_mdss_pcc_config(&zte_pcc_cfg_warm);
+		break;
+	case INTENSITY_01:
+		zte_mdss_pcc_config(&zte_pcc_cfg_normal);
+		break;
+	case INTENSITY_02:
+		zte_mdss_pcc_config(&zte_pcc_cfg_cool);
+		break;
+	default:
+#if defined(CONFIG_ZTEMT_MIPI_2K_R63419_SHARP_IPS_5P5) || \
+	defined(CONFIG_ZTEMT_MIPI_1080P_R63311_SHARP_IPS_6P4)
+		zte_mdss_pcc_config(&zte_pcc_cfg_warm);
+#else
+		zte_mdss_pcc_config(&zte_pcc_cfg_normal);
+#endif
+		break;
+	}
+}
+
+static ssize_t colortmp_show(struct kobject *kobj, 
+	struct kobj_attribute *attr, char *buf)
+{	
+	return snprintf(buf, PAGE_SIZE, "%d\n",	zte_enhance_val.colortmp);
+}
+
+static ssize_t colortmp_store(struct kobject *kobj, struct kobj_attribute *attr,
+    const char *buf, size_t size)
+>>>>>>> 126142f... update to relV16
 {
 	snprintf(buf, 50, "%u\n", zte_intensity_value);
 
