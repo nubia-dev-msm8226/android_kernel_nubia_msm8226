@@ -94,8 +94,8 @@ static int cap_sb_statfs(struct dentry *dentry)
 	return 0;
 }
 
-static int cap_sb_mount(char *dev_name, struct path *path, char *type,
-			unsigned long flags, void *data)
+static int cap_sb_mount(const char *dev_name, struct path *path,
+			const char *type, unsigned long flags, void *data)
 {
 	return 0;
 }
@@ -411,6 +411,11 @@ static int cap_kernel_create_files_as(struct cred *new, struct inode *inode)
 }
 
 static int cap_kernel_module_request(char *kmod_name)
+{
+	return 0;
+}
+
+static int cap_kernel_module_from_file(struct file *file)
 {
 	return 0;
 }
@@ -990,6 +995,7 @@ void __init security_fixup_ops(struct security_operations *ops)
 	set_to_cap_if_null(ops, kernel_act_as);
 	set_to_cap_if_null(ops, kernel_create_files_as);
 	set_to_cap_if_null(ops, kernel_module_request);
+	set_to_cap_if_null(ops, kernel_module_from_file);
 	set_to_cap_if_null(ops, task_fix_setuid);
 	set_to_cap_if_null(ops, task_setpgid);
 	set_to_cap_if_null(ops, task_getpgid);

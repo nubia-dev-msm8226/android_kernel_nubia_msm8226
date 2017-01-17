@@ -71,7 +71,12 @@
 			vcc_i2c-supply = <&pm8226_lvs1>;
 			synaptics,reset-gpio = <&msmgpio 16 0x00>;
 			synaptics,irq-gpio = <&msmgpio 17 0x00>;
-			synaptics,regulator_en;
+			synaptics,reset_on_state = <0>;
+			synaptics,reset_delay_ms = <100>;
+			synaptics,reset_active_ms = <20>;
+			//synaptics,power_gpio = <-1>;
+			synaptics,power_on_state = <1>;
+			synaptics,power_delay_ms = <160>;
 		};
 /* ZTEMT END */
 	};
@@ -159,6 +164,7 @@
 
 		qcom,cdc-mclk-gpios = <&pm8226_gpios 1 0>;
 		qcom,cdc-vdd-spkr-gpios = <&pm8226_gpios 2 0>;
+		qcom,cdc-us-euro-gpios = <&msmgpio 69 0>;
 	};
 
 	sound-9302 {
@@ -176,6 +182,7 @@
 
 		qcom,cdc-mclk-gpios = <&pm8226_gpios 1 0>;
 		qcom,cdc-vdd-spkr-gpios = <&pm8226_gpios 2 0>;
+		qcom,cdc-us-euro-gpios = <&msmgpio 69 0>;
 	};
 };
 
@@ -192,6 +199,9 @@
 
 	qcom,hsusb-otg-mode = <3>;
 	vbus_otg-supply = <&pm8226_chg_otg>;
+
+	qcom,hsusb-otg-mpm-dpsehv-int = <49>;
+	qcom,hsusb-otg-mpm-dmsehv-int = <58>;
 };
 
 &sdcc1 {
@@ -317,6 +327,7 @@
 				qcom,mode = "manual";
 				qcom,source-sel = <1>;
 				qcom,mode-ctrl = <0x60>;
+				qcom,in-order-command-processing;
 			};
 		};
 
@@ -343,6 +354,7 @@
 						  00 00 00 00 00
 						  00];
 				qcom,use-blink;
+				qcom,in-order-command-processing;
 			};
 		};
 
@@ -370,6 +382,7 @@
 						  00 00 00 00 00
 						  00];
 				qcom,use-blink;
+				qcom,in-order-command-processing;
 			};
 		};
 	};
@@ -542,8 +555,11 @@
 	qcom,battery-data = <&mtp_batterydata>;
 };
 
+/*
+* CONFIG_ZTEMT_CHARGE
+*/
 &pm8226_chg {
-	qcom,charging-disabled;
+	/*qcom,charging-disabled;*/
 	qcom,battery-data = <&mtp_batterydata>;
 };
 
@@ -559,7 +575,8 @@
 };
 
 &mdss_dsi0 {
-	//qcom,dsi-pref-prim-pan = <&dsi_nt35590_720_vid>;
+    //qcom,dsi-pref-prim-pan = <&dsi_r69431_720_cmd>;
+    //qcom,dsi-pref-prim-pan = <&dsi_otm1282a_720_cmd>;
 };
 
 &mdss_dsi0 {

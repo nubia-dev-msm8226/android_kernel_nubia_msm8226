@@ -186,13 +186,13 @@
 #define TAPAN_A_MICB_CFILT_1_PRECHRG			(0x12A)
 #define TAPAN_A_MICB_CFILT_1_PRECHRG__POR				(0x00)
 #define TAPAN_A_MICB_1_CTL			(0x12B)
-#if defined(CONFIG_ZTEMT_AUDIO)
+#if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO_NE501J)
 #define TAPAN_A_MICB_1_CTL__POR				(0x12)
 #else
 #define TAPAN_A_MICB_1_CTL__POR				(0x02)
 #endif
 #define TAPAN_A_MICB_1_INT_RBIAS			(0x12C)
-#if defined(CONFIG_ZTEMT_AUDIO)
+#if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO_NE501J)
 #define TAPAN_A_MICB_1_INT_RBIAS__POR				(0x00)
 #else 
 #define TAPAN_A_MICB_1_INT_RBIAS__POR				(0x24)
