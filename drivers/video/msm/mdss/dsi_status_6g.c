@@ -60,7 +60,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 		return;
 	}
 
-//+++duguowei,crash if no lcd
+/*duguowei,crash if no lcd
 	if(ctrl_pdata->panel_name == NULL || !strcmp("",ctrl_pdata->panel_name)){
 		fb_unregister_client(&pstatus_data->fb_notifier);
 		cancel_delayed_work_sync(&pstatus_data->check_status);
@@ -68,7 +68,7 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 		pr_debug("%s: DSI ctrl status work queue removed\n", __func__);
 		return;
 	}
-//---duguowei,crash if no lcd
+duguowei,crash if no lcd */
 
 	mdp5_data = mfd_to_mdp5_data(pstatus_data->mfd);
 	ctl = mfd_to_ctl(pstatus_data->mfd);

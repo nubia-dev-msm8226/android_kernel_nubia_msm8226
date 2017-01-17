@@ -36,7 +36,7 @@
 
 #include <linux/i2c.h>
 #include "aw_9106b.h"
-#include  <../../include/linux/printk.h>
+#include  "../../include/linux/printk.h"
 
 static bool AW9106B_SUSPEND_FLAG=false; 
 //#define GPIO_PWDN 28
@@ -1047,6 +1047,27 @@ static ssize_t set_outn(struct device *dev,
 const static DEVICE_ATTR(outn, S_IRUGO | S_IWUSR,
 		show_outn, set_outn);
 
+//debug_mask
+static ssize_t show_debug_mask(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+
+	return sprintf(buf, "%d\n", debug_mask);
+}
+
+static ssize_t set_debug_mask(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+
+	sscanf(buf, "%d", &debug_mask);
+	AW_DBG("debug_mask= %d \n",debug_mask);
+
+	return count;
+}
+//path: sys/class/leds/red/debug_mask
+const static DEVICE_ATTR(debug_mask, S_IRUGO | S_IWUSR,
+		show_debug_mask, set_debug_mask);
+
 #if 0
 static int store_outn(const char *val, struct kernel_param *kp)
 
@@ -1160,6 +1181,11 @@ static int  aw9106b_probe(struct i2c_client *client,
 		dev_err(breath_led.dev, "failed: cannot create outn.\n");
 	}
 
+    ret = device_create_file(breath_led.dev, &dev_attr_debug_mask);
+	if (unlikely(ret < 0)) {
+		dev_err(breath_led.dev, "failed: cannot create debug_mask.\n");
+	}
+
 	INIT_WORK(&aw9106b_data.work, aw9106b_work_func);
 
 	hrtimer_init(&aw9106b_data.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -1191,14 +1217,22 @@ static int aw9106b_remove(struct i2c_client *client)
 
 static int aw9106b_suspend(struct i2c_client *cl, pm_message_t mesg)
 {
-    AW9106B_SUSPEND_FLAG=true;
-	return 0;
+	AW9106B_SUSPEND_FLAG=true;
+
+	AW_DBG("aw9106 suspend start\n");
+	cancel_work_sync(&aw9106b_data.work);
+	AW_DBG("aw9106 cancel work\n");
+	flush_work(&aw9106b_data.work);
+	AW_DBG("aw9106 suspend end\n");
+    return 0;
 };
 
 static int aw9106b_resume(struct i2c_client *cl)
 {   
     AW9106B_SUSPEND_FLAG=false;
-	return 0;
+
+	AW_DBG("aw9106 resume\n");
+    return 0;
 };
 
 

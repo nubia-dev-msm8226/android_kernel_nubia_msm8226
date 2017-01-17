@@ -928,6 +928,12 @@ config FB_MSM_EXTMDDI_NONE
 	  This will disable External MDDI functionality.
 endchoice
 
+#+++ duguowei add,2013.12.24
+config ZTEMT_LCD_CMD_MODE
+    bool "ztemt_8926_lcd_cmd_mode"
+    default n
+#--- duguowei add,2013.12.24
+
 choice
 	prompt "Default framebuffer color depth"
 	depends on FB_MSM_MDP40 || FB_MSM_MDP31 || FB_MSM_MDP303

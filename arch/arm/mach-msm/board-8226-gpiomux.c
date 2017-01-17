@@ -154,13 +154,18 @@ static struct gpiomux_setting gpio_spi_act_config = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
-#if 0
+//+++ modify by duguowei,2013.12.18,for breath led
+#ifdef CONFIG_ZTEMT_BREATH_LED_GPIO_I2C
+//
+#else
 static struct gpiomux_setting gpio_spi_cs_act_config = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_6MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
 #endif
+//--- modify by duguowei,2013.12.18,for breath led
+
 static struct gpiomux_setting gpio_spi_susp_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -327,7 +332,8 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
 		},
 	},
-	#if 1
+//+++ modify by duguowei,2013.12.18
+	#ifdef CONFIG_ZTEMT_BREATH_LED_GPIO_I2C
 	{
 		.gpio      = 2,		/* BLSP1 QUP1 I2C_SDA */
 		.settings = {
@@ -358,6 +364,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		},
 	},
 	#endif
+//--- modify by duguowei,2013.12.18
 	{
 		.gpio      = 14,	/* BLSP1 QUP4 I2C_SDA */
 		.settings = {
@@ -869,7 +876,29 @@ static struct msm_gpiomux_config msm_sensor_configs_skuf_plus[] __initdata = {
 	},
 };
 
+#ifdef CONFIG_ZTEMT_AUDIO_NX404H
 
+static struct gpiomux_setting euro_america_HP_act_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+
+static struct gpiomux_setting euro_america_HP_suspend_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+static struct msm_gpiomux_config msm_euro_america_HP_configs[] __initdata = {
+	{
+		.gpio = 63,
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &euro_america_HP_suspend_cfg,
+			[GPIOMUX_ACTIVE] = &euro_america_HP_act_cfg,
+		},
+	},
+};
+#else
 static struct gpiomux_setting auxpcm_act_cfg = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_8MA,
@@ -912,6 +941,7 @@ static struct msm_gpiomux_config msm_auxpcm_configs[] __initdata = {
 		},
 	},
 };
+#endif
 
 static struct gpiomux_setting usb_otg_sw_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -1066,8 +1096,12 @@ void __init msm8226_init_gpiomux(void)
 		msm_gpiomux_install(msm_sensor_configs_skuf_plus,
 			ARRAY_SIZE(msm_sensor_configs_skuf_plus));
 
-	msm_gpiomux_install(msm_auxpcm_configs,
+#ifdef CONFIG_ZTEMT_AUDIO_NX404H
+	msm_gpiomux_install(msm_euro_america_HP_configs,ARRAY_SIZE(msm_euro_america_HP_configs));
+#else
+    msm_gpiomux_install(msm_auxpcm_configs,
 			ARRAY_SIZE(msm_auxpcm_configs));
+#endif
 
 	if (of_board_is_cdp() || of_board_is_mtp() || of_board_is_xpm())
 		msm_gpiomux_install(usb_otg_sw_configs,

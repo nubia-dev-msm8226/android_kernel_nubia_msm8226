@@ -3281,11 +3281,14 @@ static struct clk_lookup msm_clocks_8226[] = {
 	CLK_LOOKUP("dfab_clk",            pnoc_sps_clk.c, "msm_sps"),
 	CLK_LOOKUP("dma_bam_pclk", gcc_bam_dma_ahb_clk.c, "msm_sps"),
 
-#if 1
+//+++ add by duguowei,2013.12.18,for breath led
+#ifdef CONFIG_ZTEMT_BREATH_LED_GPIO_I2C
 	/* I2C Clocks */
 	CLK_LOOKUP("iface_clk",          gcc_blsp1_ahb_clk.c, "f9923000.i2c"),
 	CLK_LOOKUP("core_clk", gcc_blsp1_qup1_i2c_apps_clk.c, "f9923000.i2c"),
 #endif
+//--- add by duguowei,2013.12.18,for breath led
+
 	/* I2C Clocks */
 	CLK_LOOKUP("iface_clk",          gcc_blsp1_ahb_clk.c, "f9926000.i2c"),
 	CLK_LOOKUP("core_clk", gcc_blsp1_qup4_i2c_apps_clk.c, "f9926000.i2c"),

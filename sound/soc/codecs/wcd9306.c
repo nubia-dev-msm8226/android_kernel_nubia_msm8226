@@ -2372,7 +2372,7 @@ static int tapan_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 
 		if (strnstr(w->name, internal1_text, 30))
                 {
-                #if defined(CONFIG_ZTEMT_AUDIO)
+                #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO_NE501J)
 			snd_soc_update_bits(codec, micb_int_reg, 0xE0, 0x00);
                 #else
 			snd_soc_update_bits(codec, micb_int_reg, 0xE0, 0xE0);
@@ -5370,7 +5370,7 @@ static int tapan_handle_pdata(struct tapan_priv *tapan)
 	}
 
 	/* Set micbias capless mode with tail current */
-        #if defined(CONFIG_ZTEMT_AUDIO)
+        #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO_NE501J)
 	value = (pdata->micbias.bias1_cap_mode == MICBIAS_EXT_BYP_CAP ?
 		 0x10 : 0x10);
         #else
