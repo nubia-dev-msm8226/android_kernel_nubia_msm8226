@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
-=======
 /* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
->>>>>>> cca1e65... msm: kgsl: Remove the "global" locking from the ioctl path
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and

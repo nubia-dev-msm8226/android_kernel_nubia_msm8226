@@ -200,7 +200,6 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	}
 	sync_fence_install(fence, priv.fence_fd);
 
-<<<<<<< HEAD
 	/*
 	 * If the timestamp hasn't expired yet create an event to trigger it.
 	 * Otherwise, just signal the fence - there is no reason to go through
@@ -219,8 +218,6 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 
 	kgsl_context_put(context);
 
-=======
->>>>>>> cca1e65... msm: kgsl: Remove the "global" locking from the ioctl path
 	/* Unlock the mutex before copying to user */
 	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 
@@ -229,24 +226,6 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 		goto out;
 	}
 
-<<<<<<< HEAD
-=======
-	/*
-	 * Hold the context ref-count for the event - it will get released in
-	 * the callback
-	 */
-
-	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
-
-	ret = kgsl_add_event(device, context_id, timestamp,
-			kgsl_fence_event_cb, event, owner);
-
-	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
-
-	if (ret)
-		goto out;
-
->>>>>>> cca1e65... msm: kgsl: Remove the "global" locking from the ioctl path
 	return 0;
 
 unlock:
