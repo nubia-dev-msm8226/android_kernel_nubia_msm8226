@@ -68,11 +68,8 @@
 #include <linux/shmem_fs.h>
 #include <linux/slab.h>
 #include <linux/perf_event.h>
-<<<<<<< HEAD
-=======
 #include <linux/random.h>
 #include <linux/sched_clock.h>
->>>>>>> 9451e32... update Rel V9
 
 #include <asm/io.h>
 #include <asm/bugs.h>
