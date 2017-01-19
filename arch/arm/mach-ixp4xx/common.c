@@ -28,11 +28,8 @@
 #include <linux/clockchips.h>
 #include <linux/io.h>
 #include <linux/export.h>
-<<<<<<< HEAD
-=======
 #include <linux/gpio.h>
 #include <linux/sched_clock.h>
->>>>>>> 9451e32... update Rel V9
 
 #include <mach/udc.h>
 #include <mach/hardware.h>
