@@ -3238,12 +3238,7 @@ CONFIG_QPNP_REVID=y
 # CONFIG_QPNP_COINCELL is not set
 # CONFIG_IPA is not set
 CONFIG_MSM_AVTIMER=y
-<<<<<<< HEAD:arch/arm/configs/msm8926-ne501j_defconfig
 CONFIG_PFT=y
-=======
-# CONFIG_PFT is not set
-CONFIG_ZTE_POWEROFF_ALARM=y
->>>>>>> cf6eeda... update to rel v11:arch/arm/configs/cm-nx505j_defconfig
 # CONFIG_SSM is not set
 CONFIG_CLKDEV_LOOKUP=y
 CONFIG_HAVE_CLK_PREPARE=y
