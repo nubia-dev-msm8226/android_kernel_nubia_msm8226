@@ -3,7 +3,7 @@
  * FocalTech ft5x06 TouchScreen driver.
  *
  * Copyright (c) 2010  Focal tech Ltd.
- * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -30,6 +30,12 @@
 #include <linux/firmware.h>
 #include <linux/debugfs.h>
 #include <linux/input/ft5x06_ts.h>
+#include <linux/usb.h>
+//#include "ft5x06_ts.h"
+static unsigned char CTPM_FW[]=
+{
+	#include "Ver0B_ZTEME_NE501_FT5336_50i71_20140310_app.h"
+};
 
 #if defined(CONFIG_FB)
 #include <linux/notifier.h>
@@ -69,6 +75,7 @@
 #define FT_REG_THGROUP		0x80
 #define FT_REG_ECC		0xCC
 #define FT_REG_RESET_FW		0x07
+#define FT_REG_FW_MAJ_VER	0xB1
 #define FT_REG_FW_MIN_VER	0xB2
 #define FT_REG_FW_SUB_MIN_VER	0xB3
 
@@ -184,6 +191,105 @@ enum {
 
 #define FT_DEBUG_DIR_NAME	"ts_debug"
 
+//+++duguowei
+
+#define FT5336_FW_UPGRADE_WITH_I_FILE 1
+#define FW_NEW_BOOTLOADER 1
+#define FTS_APK_DEBUG 1
+#ifdef CONFIG_USB
+static int usb_plug_status=0;
+#endif
+/*upgrade config of FT5606*/
+#define FT5606_UPGRADE_AA_DELAY 		50
+#define FT5606_UPGRADE_55_DELAY 		10
+#define FT5606_UPGRADE_ID_1			0x79
+#define FT5606_UPGRADE_ID_2			0x06
+#define FT5606_UPGRADE_READID_DELAY 	100
+#define FT5606_UPGRADE_EARSE_DELAY		1500
+
+/*upgrade config of FT5316*/
+#define FT5316_UPGRADE_AA_DELAY 		50
+#define FT5316_UPGRADE_55_DELAY 		40
+#define FT5316_UPGRADE_ID_1			0x79
+#define FT5316_UPGRADE_ID_2			0x07
+#define FT5316_UPGRADE_READID_DELAY 	1
+#define FT5316_UPGRADE_EARSE_DELAY		1500
+
+/*upgrade config of FT5x06(x=2,3,4)*/
+#define FT5X06_UPGRADE_AA_DELAY 		50
+#define FT5X06_UPGRADE_55_DELAY 		30
+#define FT5X06_UPGRADE_ID_1			0x79
+#define FT5X06_UPGRADE_ID_2			0x03
+#define FT5X06_UPGRADE_READID_DELAY 	1
+#define FT5X06_UPGRADE_EARSE_DELAY		1500
+
+/*upgrade config of FT5X36*/
+#define FT5X36_UPGRADE_AA_DELAY 		30
+#define FT5X36_UPGRADE_55_DELAY 		30
+#define FT5X36_UPGRADE_ID_1			0x79
+#define FT5X36_UPGRADE_ID_2			0x11
+#define FT5X36_UPGRADE_READID_DELAY 	10
+#define FT5X36_UPGRADE_EARSE_DELAY		1500
+
+/*upgrade config of FT5336*/
+#define FT5336_UPGRADE_AA_DELAY 		30
+#define FT5336_UPGRADE_55_DELAY 		30
+#define FT5336_UPGRADE_ID_1			0x79
+#define FT5336_UPGRADE_ID_2			0x11
+#define FT5336_UPGRADE_READID_DELAY 	10
+#define FT5336_UPGRADE_EARSE_DELAY		1500
+
+
+#define    FT_PACKET_LENGTH        128
+#define    FT_SETTING_BUF_LEN        128
+
+
+
+#define HAVE_TOUCH_KEY 1
+#define MAX_KEY_NUM 3
+u32 button_map[MAX_KEY_NUM];//map dts key map
+u32 KEY_MAP[MAX_KEY_NUM] = {KEY_MENU,KEY_HOME,KEY_BACK};//map:button_map
+
+#define KEY_STEP 50
+#define KEY_Y_AVE 1350
+#define KEY_Y_MIN (KEY_Y_AVE - KEY_STEP)
+#define KEY_Y_MAX (KEY_Y_AVE + KEY_STEP)
+
+//menu
+#define KEY_MENU_X_AVE 160
+#define KEY_MENU_X_MIN (KEY_MENU_X_AVE - KEY_STEP)
+#define KEY_MENU_X_MAX (KEY_MENU_X_AVE + KEY_STEP)
+
+//home
+#define KEY_HOME_X_AVE 360
+#define KEY_HOME_X_MIN (KEY_HOME_X_AVE - KEY_STEP)
+#define KEY_HOME_X_MAX (KEY_HOME_X_AVE + KEY_STEP)
+#define KEY_HOME_Y_AVE 1350
+#define KEY_HOME_Y_MIN (KEY_HOME_Y_AVE - KEY_STEP)
+#define KEY_HOME_Y_MAX (KEY_HOME_Y_AVE + KEY_STEP)
+
+//back
+#define KEY_BACK_X_AVE 580
+#define KEY_BACK_X_MIN (KEY_BACK_X_AVE - KEY_STEP)
+#define KEY_BACK_X_MAX (KEY_BACK_X_AVE + KEY_STEP)
+#define KEY_BACK_Y_AVE 1350
+#define KEY_BACK_Y_MIN (KEY_BACK_Y_AVE - KEY_STEP)
+#define KEY_BACK_Y_MAX (KEY_BACK_Y_AVE + KEY_STEP)
+
+
+#define FT_KEY_Y_CHECK(y)	\
+	((y) >= KEY_Y_MIN && (y) <= KEY_Y_MAX)
+
+#define FT_KEY_MENU_CHECK(x,y)	\
+	((x) >= KEY_MENU_X_MIN && (x) <= KEY_MENU_X_MAX && (y) >= KEY_Y_MIN && (y) <= KEY_Y_MAX)
+#define FT_KEY_HOME_CHECK(x,y)	\
+	((x) >= KEY_HOME_X_MIN && (x) <= KEY_HOME_X_MAX && (y) >= KEY_Y_MIN && (y) <= KEY_Y_MAX)
+#define FT_KEY_BACK_CHECK(x,y)	\
+	((x) >= KEY_BACK_X_MIN && (x) <= KEY_BACK_X_MAX && (y) >= KEY_Y_MIN && (y) <= KEY_Y_MAX)
+
+
+//---duguowei
+
 struct ft5x06_ts_data {
 	struct i2c_client *client;
 	struct input_dev *input_dev;
@@ -207,6 +313,11 @@ struct ft5x06_ts_data {
 #endif
 };
 
+//+++duguowei
+#ifdef CONFIG_PM_SLEEP
+struct ft5x06_ts_data *ft_ts_data;
+#endif
+//---duguowei
 static int ft5x06_i2c_read(struct i2c_client *client, char *writebuf,
 			   int writelen, char *readbuf, int readlen)
 {
@@ -288,7 +399,7 @@ static void ft5x06_update_fw_ver(struct ft5x06_ts_data *data)
 	u8 reg_addr;
 	int err;
 
-	reg_addr = FT_REG_FW_VER;
+	reg_addr = FT_REG_FW_MAJ_VER;
 	err = ft5x06_i2c_read(client, &reg_addr, 1, &data->fw_ver[0], 1);
 	if (err < 0)
 		dev_err(&client->dev, "fw major version read failed");
@@ -361,6 +472,46 @@ static irqreturn_t ft5x06_ts_interrupt(int irq, void *dev_id)
 		}
 	}
 
+//+++duguowei
+#if HAVE_TOUCH_KEY
+	//printk("[ft5x06] key.....x = %d\n",x);
+	//printk("[ft5x06] key.....y = %d\n",y);
+
+	if(FT_KEY_Y_CHECK(y))
+	{
+		update_input = false;
+		if(FT_KEY_MENU_CHECK(x,y)){
+			input_report_key(ip_dev, KEY_MAP[0], (status == FT_TOUCH_DOWN || status == FT_TOUCH_CONTACT)?1:0);
+		}else if (FT_KEY_HOME_CHECK(x,y)){
+			input_report_key(ip_dev, KEY_MAP[1],  (status == FT_TOUCH_DOWN || status == FT_TOUCH_CONTACT)?1:0);
+		}else if(FT_KEY_BACK_CHECK(x,y)){
+			input_report_key(ip_dev, KEY_MAP[2], (status == FT_TOUCH_DOWN || status == FT_TOUCH_CONTACT)?1:0);
+		}else{
+			//other region,report nothing
+			printk("[ft5x06] no key pressed..... x = %d\n",x);
+		}
+		input_sync(ip_dev);
+	}
+
+#if 0	//for debug
+	if(y == 1350)
+	{
+		update_input = false;
+		//160 360 580
+		if(x == 160){
+			input_report_key(ip_dev, KEY_MENU, (status == FT_TOUCH_DOWN )?1:0);
+		}else if(x == 360){
+			input_report_key(ip_dev, KEY_HOME,  (status == FT_TOUCH_DOWN )?1:0);
+		}else if(x == 580){
+			input_report_key(ip_dev, KEY_BACK, (status == FT_TOUCH_DOWN )?1:0);
+		}else{
+			printk("[ft5x06] key..... x = %d\n",x);
+		}
+		input_sync(ip_dev);
+	}
+#endif
+#endif
+//---duguowei
 	if (update_input) {
 		input_mt_report_pointer_emulation(ip_dev, false);
 		input_sync(ip_dev);
@@ -493,6 +644,7 @@ static int ft5x06_ts_suspend(struct device *dev)
 		dev_info(dev, "Already in suspend state\n");
 		return 0;
 	}
+	printk("ft5336_ts_suspend is processing..\n");
 
 	disable_irq(data->client->irq);
 
@@ -569,7 +721,19 @@ static int ft5x06_ts_resume(struct device *dev)
 	}
 
 	msleep(data->pdata->soft_rst_dly);
-
+//+++duguowei
+	//fix bug: fts failed set reg when usb plug in under suspend mode
+	printk("ft5336_ts_resume is processing..\n");
+#if defined(CONFIG_USB)
+	if(usb_plug_status==1){
+		printk("ft5336_ts_resume is processing,usb is plug..\n");
+		i2c_smbus_write_byte_data( data->client, 0x8B,0x3);
+	}else{
+		printk("ft5336_ts_resume is processing,usb not plug..\n");
+		i2c_smbus_write_byte_data( data->client, 0x8B,0x1);
+	}
+#endif
+//---duguowei
 	enable_irq(data->client->irq);
 
 	data->suspended = false;
@@ -589,10 +753,14 @@ static int fb_notifier_callback(struct notifier_block *self,
 	if (evdata && evdata->data && event == FB_EVENT_BLANK &&
 			ft5x06_data && ft5x06_data->client) {
 		blank = evdata->data;
-		if (*blank == FB_BLANK_UNBLANK)
+		if (*blank == FB_BLANK_UNBLANK){
+			printk("ft5336 ts resume...\n");
 			ft5x06_ts_resume(&ft5x06_data->client->dev);
-		else if (*blank == FB_BLANK_POWERDOWN)
+		}
+		else if (*blank == FB_BLANK_POWERDOWN){
+			printk("ft5336 ts suspend...\n");
 			ft5x06_ts_suspend(&ft5x06_data->client->dev);
+		}
 	}
 
 	return 0;
@@ -876,11 +1044,6 @@ static int ft5x06_fw_upgrade(struct device *dev, bool force)
 	u8 fw_file_maj, fw_file_min, fw_file_sub_min;
 	bool fw_upgrade = false;
 
-	if (data->suspended) {
-		dev_info(dev, "Device is in suspend state: Exit FW upgrade\n");
-		return -EBUSY;
-	}
-
 	rc = request_firmware(&fw, data->fw_name, dev);
 	if (rc < 0) {
 		dev_err(dev, "Request firmware failed - %s (%d)\n",
@@ -903,10 +1066,17 @@ static int ft5x06_fw_upgrade(struct device *dev, bool force)
 	dev_info(dev, "New firmware: %d.%d.%d", fw_file_maj,
 				fw_file_min, fw_file_sub_min);
 
-	if (force)
+	if (force) {
 		fw_upgrade = true;
-	else if (data->fw_ver[0] < fw_file_maj)
-		fw_upgrade = true;
+	} else if (data->fw_ver[0] == fw_file_maj) {
+			if (data->fw_ver[1] < fw_file_min)
+				fw_upgrade = true;
+			else if (data->fw_ver[2] < fw_file_sub_min)
+				fw_upgrade = true;
+			else
+				dev_info(dev, "No need to upgrade\n");
+	} else
+		dev_info(dev, "Firmware versions do not match\n");
 
 	if (!fw_upgrade) {
 		dev_info(dev, "Exiting fw upgrade...\n");
@@ -1217,7 +1387,7 @@ static int ft5x06_parse_dt(struct device *dev,
 	struct device_node *np = dev->of_node;
 	struct property *prop;
 	u32 temp_val, num_buttons;
-	u32 button_map[MAX_BUTTONS];
+	//u32 button_map[MAX_BUTTONS];
 
 	pdata->name = "focaltech";
 	rc = of_property_read_string(np, "focaltech,name", &pdata->name);
@@ -1367,6 +1537,709 @@ static int ft5x06_parse_dt(struct device *dev,
 }
 #endif
 
+//+++duguowei
+#ifdef FT5336_FW_UPGRADE_WITH_I_FILE
+
+#ifdef CONFIG_PM_SLEEP
+
+static int focaltech_ts_event(struct notifier_block *this, unsigned long event,void *ptr)
+{
+	int ret;
+
+	switch(event)
+	{
+	case 0:
+		//offline
+		if ( usb_plug_status != 0 ){
+	 		usb_plug_status = 0;
+			printk("[ft5336]focaltech ts config change to offline status\n");
+			i2c_smbus_write_byte_data( ft_ts_data->client, 0x8b,0x0);
+		}
+		break;
+	case 1:
+		//online
+		if ( usb_plug_status != 1 ){
+	 		usb_plug_status = 1;
+			printk("[ft5336]focaltech ts config change to online status\n");
+			i2c_smbus_write_byte_data( ft_ts_data->client, 0x8b,0x1);
+		}
+		break;
+	default:
+		printk("focaltech ts config change to other status action is %lu\n",event);
+		break;
+	}
+
+	ret = NOTIFY_DONE;
+
+	return ret;
+}
+
+static struct notifier_block ts_notifier = {
+	.notifier_call = focaltech_ts_event,
+};
+
+
+static BLOCKING_NOTIFIER_HEAD(ts_chain_head);
+
+int focaltech_register_ts_notifier(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&ts_chain_head, nb);
+}
+EXPORT_SYMBOL_GPL(focaltech_register_ts_notifier);
+
+int focaltech_unregister_ts_notifier(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&ts_chain_head, nb);
+}
+EXPORT_SYMBOL_GPL(focaltech_unregister_ts_notifier);
+
+int Ft5x0x_ts_notifier_call_chain(unsigned long val)
+{
+	printk("[ft5336]Ft5x0x_ts_notifier_call_chain,val = %lu\n",val);
+	return (blocking_notifier_call_chain(&ts_chain_head, val, NULL)
+			== NOTIFY_BAD) ? -EINVAL : 0;
+}
+EXPORT_SYMBOL_GPL(Ft5x0x_ts_notifier_call_chain);
+#endif
+
+
+
+static int ft5336_i2c_read(const struct i2c_client *client, char *writebuf,
+			   int writelen, char *readbuf, int readlen)
+{
+	int ret;
+
+	if (writelen > 0) {
+		struct i2c_msg msgs[] = {
+			{
+				 .addr = client->addr,
+				 .flags = 0,
+				 .len = writelen,
+				 .buf = writebuf,
+			 },
+			{
+				 .addr = client->addr,
+				 .flags = I2C_M_RD,
+				 .len = readlen,
+				 .buf = readbuf,
+			 },
+		};
+		ret = i2c_transfer(client->adapter, msgs, 2);
+		if (ret < 0)
+			dev_err(&client->dev, "%s: i2c read error.\n",
+				__func__);
+	} else {
+		struct i2c_msg msgs[] = {
+			{
+				 .addr = client->addr,
+				 .flags = I2C_M_RD,
+				 .len = readlen,
+				 .buf = readbuf,
+			 },
+		};
+		ret = i2c_transfer(client->adapter, msgs, 1);
+		if (ret < 0)
+			dev_err(&client->dev, "%s:i2c read error.\n", __func__);
+	}
+	return ret;
+}
+
+static int ft5336_i2c_write(const struct i2c_client *client, char *writebuf,
+			    int writelen)
+{
+	int ret;
+
+	struct i2c_msg msgs[] = {
+		{
+			 .addr = client->addr,
+			 .flags = 0,
+			 .len = writelen,
+			 .buf = writebuf,
+		 },
+	};
+	ret = i2c_transfer(client->adapter, msgs, 1);
+	if (ret < 0)
+		dev_err(&client->dev, "%s: i2c write error.\n", __func__);
+
+	return ret;
+}
+
+
+int ft5336_write_reg(struct i2c_client *client, u8 regaddr, u8 regvalue)
+{
+	unsigned char buf[2] = {0};
+	buf[0] = regaddr;
+	buf[1] = regvalue;
+
+	return ft5336_i2c_write(client, buf, sizeof(buf));
+}
+
+
+int ft5336_read_reg(struct i2c_client *client, u8 regaddr, u8 *regvalue)
+{
+	return ft5336_i2c_read(client, &regaddr, 1, regvalue, 1);
+}
+
+
+static ssize_t ft5336_current_fw_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	u8 uc_tp_fm_ver;
+	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
+	ft5336_read_reg(data->client, FT_REG_FW_VER, &uc_tp_fm_ver);
+	return snprintf(buf, FT_FW_NAME_MAX_LEN - 1, "%u\n", uc_tp_fm_ver);
+}
+static DEVICE_ATTR(current_fw, 0664, ft5336_current_fw_show,NULL);
+
+int fts_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf,
+			  u32 dw_lenth)
+{
+	u8 reg_val[2] = {0};
+	u32 i = 0;
+	u32 packet_number;
+	u32 j;
+	u32 temp;
+	u32 lenght;
+	u8 packet_buf[FT_PACKET_LENGTH + 6];
+	u8 auc_i2c_write_buf[10];
+	u8 bt_ecc;
+	int i_ret;
+	int n;
+	#ifdef FW_NEW_BOOTLOADER
+	u8 is_5336_new_bootloader = 0;
+	u8 is_5336_fwsize_30 = 0;
+	int fw_filenth = sizeof(CTPM_FW);
+	#endif
+
+	printk("%s fw_lenth =%d\n",__func__,dw_lenth);
+
+	#ifdef FW_NEW_BOOTLOADER
+	if(CTPM_FW[fw_filenth-12] == 30)
+	{
+		is_5336_fwsize_30 = 1;
+	}
+	else 
+	{
+		is_5336_fwsize_30 = 0;
+	}
+	#endif
+
+	for (n = 0; n < FT_UPGRADE_LOOP; n++) {
+		/*********Step 1:Reset  CTPM *****/
+		/*write 0xaa to register 0xbc */
+		
+		ft5336_write_reg(client, 0xfc, FT_UPGRADE_AA);
+		msleep(FT5336_UPGRADE_AA_DELAY);
+
+		/*write 0x55 to register 0xbc */
+		ft5336_write_reg(client, 0xfc, FT_UPGRADE_55);
+
+		msleep(FT5336_UPGRADE_55_DELAY);
+		printk("%s Step 1 end\n",__func__);
+
+		/*********Step 2:Enter upgrade mode *****/
+		auc_i2c_write_buf[0] = FT_UPGRADE_55;
+		auc_i2c_write_buf[1] = FT_UPGRADE_AA;
+		do {
+			i++;
+			i_ret = ft5336_i2c_write(client, auc_i2c_write_buf, 2);
+			msleep(5);
+		} while (i_ret <= 0 && i < 5);
+
+		printk("%s Step 2 end\n",__func__);
+
+		/*********Step 3:check READ-ID***********************/
+		msleep(FT5336_UPGRADE_READID_DELAY);
+		auc_i2c_write_buf[0] = 0x90;
+		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] =
+			0x00;
+		ft5336_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
+
+
+		if (reg_val[0] == FT5336_UPGRADE_ID_1
+			&& reg_val[1] == FT5336_UPGRADE_ID_2) {
+			//dev_dbg(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+				//reg_val[0], reg_val[1]);
+			printk("[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+				reg_val[0], reg_val[1]);
+			break;
+		} else {
+			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+				reg_val[0], reg_val[1]);
+		}
+	}
+	if (n >=  FT_UPGRADE_LOOP)
+		return -EIO;
+	auc_i2c_write_buf[0] = 0xcd;
+
+	ft5336_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
+
+#ifdef FW_NEW_BOOTLOADER
+	/*********0705 mshl ********************/
+	/*if (reg_val[0] > 4)
+		is_5336_new_bootloader = 1;*/
+
+	if (reg_val[0] <= 4)
+	{
+		is_5336_new_bootloader = 0;//BL_VERSION_LZ4 ;
+	}
+	else if(reg_val[0] == 7)
+	{
+		is_5336_new_bootloader =1;// BL_VERSION_Z7 ;
+	}
+	else if(reg_val[0] >= 0x0f)
+	{
+		is_5336_new_bootloader = 2;//BL_VERSION_GZF ;
+	}
+	printk("%s read ft5336 bootloader type %d is_5336_fwsize_30 %d end\n",
+		__func__,is_5336_new_bootloader,is_5336_fwsize_30);
+#endif
+
+	printk("%s Step 3 end\n",__func__);
+
+	/*Step 4:erase app and panel paramenter area*/
+	printk("Step 4:erase app and panel paramenter area\n");
+#ifdef FW_NEW_BOOTLOADER
+	if(is_5336_fwsize_30)
+	{
+
+		printk("[FTS] Step 4:erase app and panel paramenter area\n");
+		auc_i2c_write_buf[0] = 0x61;
+		ft5336_i2c_write(client, auc_i2c_write_buf, 1);	/*erase app area */
+		msleep(1500);
+		/*erase panel parameter area */
+		auc_i2c_write_buf[0] = 0x63;
+		ft5336_i2c_write(client, auc_i2c_write_buf, 1);
+		msleep(50);
+	}
+	else
+	{
+		auc_i2c_write_buf[0] = 0x61;
+		ft5336_i2c_write(client, auc_i2c_write_buf, 1); /*erase app area*/	
+   		msleep(1500); 
+	}
+#else	
+	auc_i2c_write_buf[0] = 0x61;
+	ft5336_i2c_write(client, auc_i2c_write_buf, 1);	/*erase app area */
+	msleep(FT5336_UPGRADE_EARSE_DELAY);
+	/*erase panel parameter area */
+	auc_i2c_write_buf[0] = 0x63;
+	ft5336_i2c_write(client, auc_i2c_write_buf, 1);
+	msleep(100);
+#endif	
+	printk("%s Step 4 end\n",__func__);
+
+	/*********Step 5:write firmware(FW) to ctpm flash*********/
+	bt_ecc = 0;
+	printk("Step 5:write firmware(FW) to ctpm flash\n");
+#ifdef FW_NEW_BOOTLOADER
+	if(is_5336_new_bootloader == 0 || is_5336_new_bootloader == 1 )
+	{
+		dw_lenth = dw_lenth - 8;
+	}
+else if (is_5336_new_bootloader == 2)
+	   	dw_lenth = dw_lenth - 14;
+#else
+	      dw_lenth = dw_lenth - 8;
+#endif
+	
+	//dw_lenth = dw_lenth - 8;
+	packet_number = (dw_lenth) / FT_PACKET_LENGTH;
+	packet_buf[0] = 0xbf;
+	packet_buf[1] = 0x00;
+
+	for (j = 0; j < packet_number; j++) {
+		temp = j * FT_PACKET_LENGTH;
+		packet_buf[2] = (u8) (temp >> 8);
+		packet_buf[3] = (u8) temp;
+		lenght = FT_PACKET_LENGTH;
+		packet_buf[4] = (u8) (lenght >> 8);
+		packet_buf[5] = (u8) lenght;
+
+		for (i = 0; i < FT_PACKET_LENGTH; i++) {
+			packet_buf[6 + i] = pbt_buf[j * FT_PACKET_LENGTH + i];
+			bt_ecc ^= packet_buf[6 + i];
+		}
+
+		ft5336_i2c_write(client, packet_buf, FT_PACKET_LENGTH + 6);
+		msleep(FT_PACKET_LENGTH / 6 + 1);
+		//DBG("write bytes:0x%04x\n", (j+1) * FT_PACKET_LENGTH);
+		//delay_qt_ms(FT_PACKET_LENGTH / 6 + 1);
+	}
+
+	if ((dw_lenth) % FT_PACKET_LENGTH > 0) {
+		temp = packet_number * FT_PACKET_LENGTH;
+		packet_buf[2] = (u8) (temp >> 8);
+		packet_buf[3] = (u8) temp;
+		temp = (dw_lenth) % FT_PACKET_LENGTH;
+		packet_buf[4] = (u8) (temp >> 8);
+		packet_buf[5] = (u8) temp;
+
+		for (i = 0; i < temp; i++) {
+			packet_buf[6 + i] = pbt_buf[packet_number * FT_PACKET_LENGTH + i];
+			bt_ecc ^= packet_buf[6 + i];
+		}
+
+		ft5336_i2c_write(client, packet_buf, temp + 6);
+		msleep(20);
+	}
+
+
+	/*send the last six byte */
+#ifdef FW_NEW_BOOTLOADER
+if(is_5336_new_bootloader == 0 || is_5336_new_bootloader == 1 )
+	{
+		for (i = 0; i<6; i++)
+		{
+			if (is_5336_new_bootloader  == 1) 
+			{
+				temp = 0x7bfa + i;
+			}
+			else if(is_5336_new_bootloader == 0)
+			{
+				temp = 0x6ffa + i;
+			}
+			packet_buf[2] = (u8)(temp>>8);
+			packet_buf[3] = (u8)temp;
+			temp =1;
+			packet_buf[4] = (u8)(temp>>8);
+			packet_buf[5] = (u8)temp;
+			packet_buf[6] = pbt_buf[ dw_lenth + i]; 
+			bt_ecc ^= packet_buf[6];
+  
+			ft5336_i2c_write(client, packet_buf, 7);
+			msleep(10);
+		}
+	}
+	else if(is_5336_new_bootloader == 2)
+	{
+		for (i = 0; i<12; i++)
+		{
+			if (is_5336_fwsize_30 ) 
+			{
+				temp = 0x7ff4 + i;
+			}else{
+				temp = 0x6ffa + i;
+			}
+			packet_buf[2] = (u8)(temp>>8);
+			packet_buf[3] = (u8)temp;
+			temp =1;
+			packet_buf[4] = (u8)(temp>>8);
+			packet_buf[5] = (u8)temp;
+			packet_buf[6] = pbt_buf[ dw_lenth + i]; 
+			bt_ecc ^= packet_buf[6];
+  
+			ft5336_i2c_write(client, packet_buf, 7);
+			msleep(10);
+
+		}
+	}
+
+#else
+	for (i = 0; i < 6; i++) {
+		temp = 0x6ffa + i;
+		packet_buf[2] = (u8) (temp >> 8);
+		packet_buf[3] = (u8) temp;
+		temp = 1;
+		packet_buf[4] = (u8) (temp >> 8);
+		packet_buf[5] = (u8) temp;
+		packet_buf[6] = pbt_buf[dw_lenth + i];
+		bt_ecc ^= packet_buf[6];
+		ft5336_i2c_write(client, packet_buf, 7);
+		msleep(20);
+	}
+
+#endif
+
+	printk("%s Step 5 end\n",__func__);
+
+	/*********Step 6: read out checksum***********************/
+	/*send the opration head */
+	printk("Step 6: read out checksum\n");
+	auc_i2c_write_buf[0] = 0xcc;
+	ft5336_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
+	if (reg_val[0] != bt_ecc) {
+		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+					reg_val[0],
+					bt_ecc);
+		return -EIO;
+	}
+	printk("%s Step 6 end\n",__func__);
+
+	/*********Step 7: reset the new FW***********************/
+	printk("Step 7: reset the new FW\n");
+	auc_i2c_write_buf[0] = 0x07;
+	ft5336_i2c_write(client, auc_i2c_write_buf, 1);
+	msleep(300);	/*make sure CTP startup normally */
+	printk("%s Step 7 end\n",__func__);
+
+	return 0;
+}
+
+/*
+upgrade with *.i file
+*/
+int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
+{
+	u8 *pbt_buf = NULL;
+	int i_ret = -1;
+	int fw_len;
+	
+	fw_len = sizeof(CTPM_FW);
+
+	/*judge the fw that will be upgraded
+	* if illegal, then stop upgrade and return.
+	*/
+	if (fw_len < 8 || fw_len > 32 * 1024) {
+		dev_err(&client->dev, "%s:FT6206 FW length error\n", __func__);
+		return -EIO;
+	}
+	
+	printk("%s ft6206 upgrade\n",__func__);
+	
+	if ((CTPM_FW[fw_len - 8] ^ CTPM_FW[fw_len - 6]) == 0xFF
+		&& (CTPM_FW[fw_len - 7] ^ CTPM_FW[fw_len - 5]) == 0xFF
+		&& (CTPM_FW[fw_len - 3] ^ CTPM_FW[fw_len - 4]) == 0xFF) {
+		/*FW upgrade */
+		pbt_buf = CTPM_FW;
+		/*call the upgrade function */
+		printk("%s len %d\n",__func__,fw_len);
+		i_ret = fts_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
+		if (i_ret != 0)
+			dev_err(&client->dev, "%s:upgrade failed. err.\n",
+					__func__);
+	#ifdef AUTO_CLB
+		else
+			fts_ctpm_auto_clb(client);	/*start auto CLB */
+	#endif
+	} else {
+		dev_err(&client->dev, "%s:FW format error\n", __func__);
+		return -EBADFD;
+	}	
+	
+	return i_ret;
+}
+
+u8 fts_ctpm_get_i_file_ver(void)
+{
+	u16 ui_sz;
+
+	ui_sz = sizeof(CTPM_FW);
+	printk("%s ft5336 get fw version, len %d\n",__func__,ui_sz);
+	if (ui_sz > 2)
+		return CTPM_FW[ui_sz - 2];
+	
+	return 0x00;	/*default value */
+}
+
+/*update project setting
+*only update these settings for COB project, or for some special case
+*/
+int fts_ctpm_update_project_setting(struct i2c_client *client)
+{
+	u8 uc_i2c_addr;	/*I2C slave address (7 bit address)*/
+	u8 uc_io_voltage;	/*IO Voltage 0---3.3v;	1----1.8v*/
+	u8 uc_panel_factory_id;	/*TP panel factory ID*/
+	u8 buf[FT_SETTING_BUF_LEN];
+	u8 reg_val[2] = {0};
+	u8 auc_i2c_write_buf[10] = {0};
+	u8 packet_buf[FT_SETTING_BUF_LEN + 6];
+	u32 i = 0;
+	int i_ret;
+
+	uc_i2c_addr = client->addr;
+	uc_io_voltage = 0x0;
+	uc_panel_factory_id = 0x5a;
+
+
+	/*Step 1:Reset  CTPM
+	*write 0xaa to register 0xfc
+	*/
+	ft5336_write_reg(client, 0xfc, 0xaa);
+	msleep(50);
+
+	/*write 0x55 to register 0xfc */
+	ft5336_write_reg(client, 0xfc, 0x55);
+	msleep(30);
+
+	/*********Step 2:Enter upgrade mode *****/
+	auc_i2c_write_buf[0] = 0x55;
+	auc_i2c_write_buf[1] = 0xaa;
+	do {
+		i++;
+		i_ret = ft5336_i2c_write(client, auc_i2c_write_buf, 2);
+		msleep(5);
+	} while (i_ret <= 0 && i < 5);
+
+
+	/*********Step 3:check READ-ID***********************/
+	auc_i2c_write_buf[0] = 0x90;
+	auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] =
+			0x00;
+
+	ft5336_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
+
+	if (reg_val[0] == 0x79 && reg_val[1] == 0x3)
+		dev_dbg(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			 reg_val[0], reg_val[1]);
+	else
+		return -EIO;
+
+	auc_i2c_write_buf[0] = 0xcd;
+	ft5336_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
+	dev_dbg(&client->dev, "bootloader version = 0x%x\n", reg_val[0]);
+
+	/*--------- read current project setting  ---------- */
+	/*set read start address */
+	buf[0] = 0x3;
+	buf[1] = 0x0;
+	buf[2] = 0x78;
+	buf[3] = 0x0;
+
+	ft5336_i2c_read(client, buf, 4, buf, FT_SETTING_BUF_LEN);
+	dev_dbg(&client->dev, "[FTS] old setting: uc_i2c_addr = 0x%x,\
+			uc_io_voltage = %d, uc_panel_factory_id = 0x%x\n",
+			buf[0], buf[2], buf[4]);
+
+	 /*--------- Step 4:erase project setting --------------*/
+	auc_i2c_write_buf[0] = 0x63;
+	ft5336_i2c_write(client, auc_i2c_write_buf, 1);
+	msleep(100);
+
+	/*----------  Set new settings ---------------*/
+	buf[0] = uc_i2c_addr;
+	buf[1] = ~uc_i2c_addr;
+	buf[2] = uc_io_voltage;
+	buf[3] = ~uc_io_voltage;
+	buf[4] = uc_panel_factory_id;
+	buf[5] = ~uc_panel_factory_id;
+	packet_buf[0] = 0xbf;
+	packet_buf[1] = 0x00;
+	packet_buf[2] = 0x78;
+	packet_buf[3] = 0x0;
+	packet_buf[4] = 0;
+	packet_buf[5] = FT_SETTING_BUF_LEN;
+
+	for (i = 0; i < FT_SETTING_BUF_LEN; i++)
+		packet_buf[6 + i] = buf[i];
+
+	ft5336_i2c_write(client, packet_buf, FT_SETTING_BUF_LEN + 6);
+	msleep(100);
+
+	/********* reset the new FW***********************/
+	auc_i2c_write_buf[0] = 0x07;
+	ft5336_i2c_write(client, auc_i2c_write_buf, 1);
+
+	msleep(200);
+	return 0;
+}
+
+int fts_ctpm_auto_upgrade(struct i2c_client *client)
+{
+	u8 uc_host_fm_ver = FT_REG_FW_VER;
+	u8 uc_tp_fm_ver;
+	int i_ret;
+
+	ft5336_read_reg(client, FT_REG_FW_VER, &uc_tp_fm_ver);
+	uc_host_fm_ver = fts_ctpm_get_i_file_ver();
+	printk("%s,tp_ver 0x%x,i_file_ver 0x%x\n",__func__,uc_tp_fm_ver,uc_host_fm_ver);
+	
+	if (/*the firmware in touch panel maybe corrupted */
+		//uc_tp_fm_ver == uc_host_fm_ver ||
+		/*the firmware in host flash is new, need upgrade */
+	     uc_tp_fm_ver != uc_host_fm_ver
+	    ) {
+	    	printk("%s start upgrade",__func__);
+		msleep(100);
+		dev_dbg(&client->dev, "[FTS] uc_tp_fm_ver = 0x%x, uc_host_fm_ver = 0x%x\n",
+				uc_tp_fm_ver, uc_host_fm_ver);
+		i_ret = fts_ctpm_fw_upgrade_with_i_file(client);
+		if (i_ret == 0)	{
+			msleep(300);
+			uc_host_fm_ver = fts_ctpm_get_i_file_ver();
+			dev_dbg(&client->dev, "[FTS] upgrade to new version 0x%x\n",
+					uc_host_fm_ver);
+			#ifdef FT5336_SYSFS_FW_REVISION
+				ft5336_fw_version = uc_host_fm_ver;
+			#endif
+		} else {
+			pr_err("[FTS] upgrade failed ret=%d.\n", i_ret);
+			return -EIO;
+		}
+	}else{
+		printk("The ctp firmware is same or laster, no need to upgrade!");
+	}
+	
+	ft5336_read_reg(client, FT_REG_FW_VER, &uc_tp_fm_ver);
+	uc_host_fm_ver = fts_ctpm_get_i_file_ver();
+	printk("%s,tp_ver 0x%x,i_file_ver 0x%x\n",__func__,uc_tp_fm_ver,uc_host_fm_ver);
+
+	return 0;
+}
+
+void delay_qt_ms(unsigned long  w_ms)
+{
+	unsigned long i;
+	unsigned long j;
+
+	for (i = 0; i < w_ms; i++)
+	{
+		for (j = 0; j < 1000; j++)
+		{
+			 udelay(1);
+		}
+	}
+}
+
+#if 0
+static ssize_t ft5336_fwupdate_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	/* place holder for future use */
+	return -EPERM;
+}
+
+/*upgrade from *.i*/
+static ssize_t ft5336_fwupdate_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	struct ft5336_ts_data *data = NULL;
+	u8 uc_host_fm_ver;
+	int i_ret;
+	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
+
+	data = (struct ft5336_ts_data *)i2c_get_clientdata(client);
+
+	mutex_lock(&g_device_mutex);
+
+	disable_irq(client->irq);
+	i_ret = fts_ctpm_fw_upgrade_with_i_file(client);
+	if (i_ret == 0) {
+		msleep(300);
+		uc_host_fm_ver = fts_ctpm_get_i_file_ver();
+		pr_info("%s [FTS] upgrade to new version 0x%x\n", __func__,
+					 uc_host_fm_ver);
+	} else
+		dev_err(&client->dev, "%s ERROR:[FTS] upgrade failed.\n",
+					__func__);
+
+	enable_irq(client->irq);
+	mutex_unlock(&g_device_mutex);
+
+	return count;
+}
+
+/*upgrade from *.i
+*example: echo 1 > ftsfwupdate
+*/
+static DEVICE_ATTR(ftsfwupdate, S_IRUGO | S_IWUSR, ft5336_fwupdate_show,
+			ft5336_fwupdate_store);
+#endif
+#endif
+
+//---duguowei
 static int ft5x06_ts_probe(struct i2c_client *client,
 			   const struct i2c_device_id *id)
 {
@@ -1377,7 +2250,11 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	u8 reg_value;
 	u8 reg_addr;
 	int err, len;
-
+//+++duguowei
+#if HAVE_TOUCH_KEY
+	int index;
+#endif
+//---duguowei
 	if (client->dev.of_node) {
 		pdata = devm_kzalloc(&client->dev,
 			sizeof(struct ft5x06_ts_platform_data), GFP_KERNEL);
@@ -1434,6 +2311,15 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 		dev_err(&client->dev, "failed to allocate input device\n");
 		return -ENOMEM;
 	}
+
+//+++duguowei
+#if HAVE_TOUCH_KEY
+		for (index = 0; index < MAX_KEY_NUM; index++)
+		{
+			input_set_capability(input_dev, EV_KEY, button_map[index]);  
+		}
+#endif
+//---duguowei
 
 	data->input_dev = input_dev;
 	data->client = client;
@@ -1543,9 +2429,8 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	data->family_id = pdata->family_id;
 
 	err = request_threaded_irq(client->irq, NULL,
-				ft5x06_ts_interrupt,
-				pdata->irqflags | IRQF_ONESHOT,
-				client->dev.driver->name, data);
+				   ft5x06_ts_interrupt, pdata->irqflags,
+				   client->dev.driver->name, data);
 	if (err) {
 		dev_err(&client->dev, "request irq failed\n");
 		goto free_reset_gpio;
@@ -1630,7 +2515,28 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 
 	dev_dbg(&client->dev, "touch threshold = %d\n", reg_value * 4);
 
-	ft5x06_update_fw_ver(data);
+//+++duguowei
+#ifdef FT5336_FW_UPGRADE_WITH_I_FILE
+	err = device_create_file(&client->dev, &dev_attr_current_fw);
+	if (err) {
+		dev_err(&client->dev, "sys file creation failed\n");
+		goto free_current_fw_sys;
+	}
+
+	printk("FT5336 probe,\n");
+	fts_ctpm_auto_upgrade(data->client);
+	//ft5x06_fw_upgrade(&client->dev,false);
+#endif
+#ifdef FT5X0X_CREATE_APK_DEBUG_CHANNEL
+	ft5x0x_create_apk_debug_channel(client);
+#endif /*!FT5X0X_CREATE_APK_DEBUG_CHANNEL*/
+
+#ifdef CONFIG_PM_SLEEP
+	ft_ts_data = data;
+	focaltech_register_ts_notifier(&ts_notifier);
+#endif
+//---duguowei
+	//ft5x06_update_fw_ver(data);
 
 	FT_STORE_TS_INFO(data->ts_info, data->family_id, data->pdata->name,
 			data->pdata->num_max_touches, data->pdata->group_id,
@@ -1656,6 +2562,10 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 
 	return 0;
 
+#ifdef FT5336_FW_UPGRADE_WITH_I_FILE
+free_current_fw_sys:
+	device_remove_file(&client->dev, &dev_attr_current_fw);
+#endif
 free_debug_dir:
 	debugfs_remove_recursive(data->dir);
 free_force_update_fw_sys:
@@ -1724,6 +2634,9 @@ static int __devexit ft5x06_ts_remove(struct i2c_client *client)
 		ft5x06_power_init(data, false);
 
 	input_unregister_device(data->input_dev);
+#ifdef CONFIG_PM_SLEEP
+		focaltech_unregister_ts_notifier(&ts_notifier);
+#endif
 
 	return 0;
 }
