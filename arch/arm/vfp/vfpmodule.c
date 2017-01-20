@@ -837,7 +837,5 @@ static int __init vfp_rootfs_init(void)
 }
 
 core_initcall(vfp_init);
-<<<<<<< HEAD
-=======
 rootfs_initcall(vfp_rootfs_init);
->>>>>>> 7b6261b... update to rel V13
+
