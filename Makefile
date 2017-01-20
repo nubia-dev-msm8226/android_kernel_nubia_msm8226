@@ -1,10 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 4
-<<<<<<< HEAD
-SUBLEVEL = 10
-=======
-SUBLEVEL = 12
->>>>>>> ceffe6d... Linux 3.4.12
+SUBLEVEL = 37
 EXTRAVERSION =
 NAME = Saber-toothed Squirrel
 
