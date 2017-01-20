@@ -16,16 +16,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+
 #ifndef _SYNAPTICS_DSX_RMI4_H_
 #define _SYNAPTICS_DSX_RMI4_H_
 
 #define SYNAPTICS_DS4 (1 << 0)
 #define SYNAPTICS_DS5 (1 << 1)
-#define SYNAPTICS_DSX_DRIVER_PRODUCT (SYNAPTICS_DS4 | SYNAPTICS_DS5)
-#define SYNAPTICS_DSX_DRIVER_VERSION 0x2001
+#define SYNAPTICS_DSX_DRIVER_PRODUCT SYNAPTICS_DS4
+#define SYNAPTICS_DSX_DRIVER_VERSION 0x1005
 
 #include <linux/version.h>
-
 /*** ZTEMT Added by luochangyang, 2013/11/29 ***/
 #if defined(CONFIG_FB)
 #include <linux/notifier.h>
@@ -33,9 +33,6 @@
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 #include <linux/earlysuspend.h>
 #endif
-#define ZTEMT_SYNAPTICS_WAKEUP_GESTURE	1
-#define ZTEMT_SYNAPTICS_PALM_SLEEP		1	//Added by luochangyang, for palm sleep  2014/03/19
-#define ZTEMT_SYNAPTICS_DEBUG			0
 /***ZTEMT END***/
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 38))
@@ -48,36 +45,30 @@
 #define sstrtoul(...) strict_strtoul(__VA_ARGS__)
 #endif
 
-#define PDT_PROPS (0X00EF)
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 7, 0))
+#define KERNEL_ABOVE_3_7
+#endif
+
+#define PDT_PROPS (0x00EF)
 #define PDT_START (0x00E9)
-#define PDT_END (0x00D0)
+#define PDT_END (0x000A)
 #define PDT_ENTRY_SIZE (0x0006)
 #define PAGES_TO_SERVICE (10)
 #define PAGE_SELECT_LEN (2)
-#define ADDRESS_WORD_LEN (2)
 
 #define SYNAPTICS_RMI4_F01 (0x01)
 #define SYNAPTICS_RMI4_F11 (0x11)
-#define SYNAPTICS_RMI4_F12 (0x12)
 #define SYNAPTICS_RMI4_F1A (0x1a)
 #define SYNAPTICS_RMI4_F34 (0x34)
-#define SYNAPTICS_RMI4_F51 (0x51)
 #define SYNAPTICS_RMI4_F54 (0x54)
 #define SYNAPTICS_RMI4_F55 (0x55)
 
-#define SYNAPTICS_RMI4_PRODUCT_INFO_SIZE 2
 #define SYNAPTICS_RMI4_DATE_CODE_SIZE 3
+#define SYNAPTICS_RMI4_PRODUCT_INFO_SIZE 2
 #define SYNAPTICS_RMI4_PRODUCT_ID_SIZE 10
 #define SYNAPTICS_RMI4_BUILD_ID_SIZE 3
 
-#define F12_FINGERS_TO_SUPPORT 10
-#define F12_NO_OBJECT_STATUS 0x00
-#define F12_FINGER_STATUS 0x01
-#define F12_STYLUS_STATUS 0x02
-#define F12_PALM_STATUS 0x03
-#define F12_HOVERING_FINGER_STATUS 0x05
-#define F12_GLOVED_FINGER_STATUS 0x06
-
+#define MAX_NUMBER_OF_FINGERS 10
 #define MAX_NUMBER_OF_BUTTONS 4
 #define MAX_INTR_REGISTERS 4
 
@@ -91,19 +82,7 @@
 #define MASK_2BIT 0x03
 #define MASK_1BIT 0x01
 
-enum exp_fn {
-	RMI_DEV = 0,
-	RMI_F54,
-	RMI_FW_UPDATER,
-	RMI_PROXIMITY,
-	RMI_ACTIVE_PEN,
-	RMI_LAST,
-};
-
-struct synaptics_dsx_hw_interface {
-	const struct synaptics_dsx_board_data *board_data;
-	const struct synaptics_dsx_bus_access *bus_access;
-};
+#define SYNAPTICS_WAKEUP_GESTURE    1
 
 /*
  * struct synaptics_rmi4_fn_desc - function descriptor fields in PDT
@@ -137,19 +116,13 @@ struct synaptics_rmi4_fn_full_addr {
 	unsigned short data_base;
 };
 
-struct synaptics_rmi4_f12_extra_data {
-	unsigned char data1_offset;
-	unsigned char data15_offset;
-	unsigned char data15_size;
-	unsigned char data15_data[(F12_FINGERS_TO_SUPPORT + 7) / 8];
-};
-
 /*
  * struct synaptics_rmi4_fn - function handler data structure
  * @fn_number: function number
  * @num_of_data_sources: number of data sources
  * @num_of_data_points: maximum number of fingers supported
  * @size_of_data_register_block: data register block size
+ * @data1_offset: offset to data1 register from data base address
  * @intr_reg_num: index to associated interrupt register
  * @intr_mask: interrupt mask
  * @full_addr: full 16-bit base addresses of function registers
@@ -162,13 +135,13 @@ struct synaptics_rmi4_fn {
 	unsigned char num_of_data_sources;
 	unsigned char num_of_data_points;
 	unsigned char size_of_data_register_block;
+	unsigned char data1_offset;
 	unsigned char intr_reg_num;
 	unsigned char intr_mask;
 	struct synaptics_rmi4_fn_full_addr full_addr;
 	struct list_head link;
 	int data_size;
 	void *data;
-	void *extra;
 };
 
 /*
@@ -195,18 +168,20 @@ struct synaptics_rmi4_device_info {
 	unsigned short serial_number;
 	unsigned char product_id_string[SYNAPTICS_RMI4_PRODUCT_ID_SIZE + 1];
 	unsigned char build_id[SYNAPTICS_RMI4_BUILD_ID_SIZE];
-	unsigned char config_id[4];     //Added by luochangyang, 2013/12/25
+	unsigned char config_id[4];
 	struct list_head support_fn_list;
 };
 
 /*
  * struct synaptics_rmi4_data - rmi4 device instance data
- * @pdev: pointer to platform device
+ * @i2c_client: pointer to associated i2c client
  * @input_dev: pointer to associated input device
- * @hw_if: pointer to hardware interface data
+ * @board: constant pointer to platform data
  * @rmi4_mod_info: device information
  * @regulator: pointer to associated regulator
  * @rmi4_io_ctrl_mutex: mutex for i2c i/o control
+ * @det_work: work thread instance for expansion function detection
+ * @det_workqueue: pointer to work queue for work thread instance
  * @early_suspend: instance to support early suspend power management
  * @current_page: current page in sensor to acess
  * @button_0d_enabled: flag for 0d button support
@@ -219,113 +194,91 @@ struct synaptics_rmi4_device_info {
  * @irq: attention interrupt
  * @sensor_max_x: sensor maximum x value
  * @sensor_max_y: sensor maximum y value
- * @irq_enabled: flag for indicating interrupt enable status
+ * @touch_stopped: flag to stop interrupt thread processing
  * @fingers_on_2d: flag to indicate presence of fingers in 2d area
  * @sensor_sleep: flag to indicate sleep state of sensor
+ * @swap_axes: set to TRUE if desired to swap x- and y-axis
+ * @flip_x: set to TRUE if desired to flip direction on x-axis
+ * @flip_y: set to TRUE if desired to flip direction on y-axis
  * @wait: wait queue for touch data polling in interrupt thread
+ * @i2c_read: pointer to i2c read function
+ * @i2c_write: pointer to i2c write function
  * @irq_enable: pointer to irq enable function
  */
 struct synaptics_rmi4_data {
-	struct platform_device *pdev;
+	struct i2c_client *i2c_client;
 	struct input_dev *input_dev;
-	const struct synaptics_dsx_hw_interface *hw_if;
+	const struct synaptics_dsx_platform_data *board;
 	struct synaptics_rmi4_device_info rmi4_mod_info;
 	struct regulator *regulator;
-	struct regulator *regulator_vcc;    //Added by luochangyang, 2013/12/19
-	struct mutex rmi4_reset_mutex;
-	struct mutex rmi4_report_mutex;
+    /*** ZTEMT Added by luochangyang, 2013/11/30 ***/
+    struct regulator *regulator_vcc;
+    /***ZTEMT END***/
 	struct mutex rmi4_io_ctrl_mutex;
-/* ZTEMT Added by luochangyang, 2013/12/25 */
-#if defined(CONFIG_FB)
+	struct delayed_work det_work;
+	struct workqueue_struct *det_workqueue;	
+    /* ZTEMT Added by luochangyang, 2013/07/10 */
+    #if defined(CONFIG_FB)
     struct notifier_block fb_notif;
-#elif defined(CONFIG_HAS_EARLYSUSPEND)
-/***ZTEMT END***/
+    #elif defined(CONFIG_HAS_EARLYSUSPEND)
+    /***ZTEMT END***/
 	struct early_suspend early_suspend;
-#endif
+    #endif
 	unsigned char current_page;
 	unsigned char button_0d_enabled;
 	unsigned char full_pm_cycle;
 	unsigned char num_of_rx;
 	unsigned char num_of_tx;
 	unsigned char num_of_fingers;
-	unsigned char max_touch_width;
-	unsigned char report_enable;
-	unsigned char no_sleep_setting;
 	unsigned char intr_mask[MAX_INTR_REGISTERS];
-	unsigned char *button_txrx_mapping;
 	unsigned short num_of_intr_regs;
 	unsigned short f01_query_base_addr;
 	unsigned short f01_cmd_base_addr;
 	unsigned short f01_ctrl_base_addr;
 	unsigned short f01_data_base_addr;
-	unsigned int firmware_id;
 	int irq;
 	int sensor_max_x;
 	int sensor_max_y;
-	bool flash_prog_mode;
-	bool irq_enabled;
 	bool touch_stopped;
 	bool fingers_on_2d;
 	bool sensor_sleep;
-	bool stay_awake;
-	bool staying_awake;
-    /*** ZTEMT Added by luochangyang, 2014/03/19 ***/
+	bool swap_axes;
+	bool flip_x;
+	bool flip_y;
+    /*** ZTEMT Added by luochangyang, 2013/11/19 ***/
     bool irq_wake;
     bool wakeup_gesture;
-    bool fw_update;
     /***ZTEMT END***/
+	wait_queue_head_t wait;
+	int (*i2c_read)(struct synaptics_rmi4_data *pdata, unsigned short addr,
+			unsigned char *data, unsigned short length);
+	int (*i2c_write)(struct synaptics_rmi4_data *pdata, unsigned short addr,
+			unsigned char *data, unsigned short length);
 	int (*irq_enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
 	int (*reset_device)(struct synaptics_rmi4_data *rmi4_data);
 };
 
-struct synaptics_dsx_bus_access {
-	unsigned char type;
+enum exp_fn {
+	RMI_DEV = 0,
+	RMI_F34,
+	RMI_F54,
+	RMI_FW_UPDATER,
+	RMI_LAST,
+};
+
+struct synaptics_rmi4_exp_fn_ptr {
 	int (*read)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-		unsigned char *data, unsigned short length);
+			unsigned char *data, unsigned short length);
 	int (*write)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-		unsigned char *data, unsigned short length);
+			unsigned char *data, unsigned short length);
+	int (*enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
 };
 
-struct synaptics_rmi4_exp_fn {
-	enum exp_fn fn_type;
-	int (*init)(struct synaptics_rmi4_data *rmi4_data);
-	void (*remove)(struct synaptics_rmi4_data *rmi4_data);
-	void (*reset)(struct synaptics_rmi4_data *rmi4_data);
-	void (*reinit)(struct synaptics_rmi4_data *rmi4_data);
-	void (*early_suspend)(struct synaptics_rmi4_data *rmi4_data);
-	void (*suspend)(struct synaptics_rmi4_data *rmi4_data);
-	void (*resume)(struct synaptics_rmi4_data *rmi4_data);
-	void (*late_resume)(struct synaptics_rmi4_data *rmi4_data);
-	void (*attn)(struct synaptics_rmi4_data *rmi4_data,
-			unsigned char intr_mask);
-};
-
-int synaptics_rmi4_bus_init(void);
-
-void synaptics_rmi4_bus_exit(void);
-
-void synaptics_rmi4_new_function(struct synaptics_rmi4_exp_fn *exp_fn_module,
-		bool insert);
-
-int synaptics_fw_updater(unsigned char *fw_data);
-
-static inline int synaptics_rmi4_reg_read(
-		struct synaptics_rmi4_data *rmi4_data,
-		unsigned short addr,
-		unsigned char *data,
-		unsigned short len)
-{
-	return rmi4_data->hw_if->bus_access->read(rmi4_data, addr, data, len);
-}
-
-static inline int synaptics_rmi4_reg_write(
-		struct synaptics_rmi4_data *rmi4_data,
-		unsigned short addr,
-		unsigned char *data,
-		unsigned short len)
-{
-	return rmi4_data->hw_if->bus_access->write(rmi4_data, addr, data, len);
-}
+void synaptics_rmi4_new_function(enum exp_fn fn_type, bool insert,
+		int (*func_init)(struct synaptics_rmi4_data *rmi4_data),
+		void (*func_remove)(struct synaptics_rmi4_data *rmi4_data),
+		void (*func_attn)(struct synaptics_rmi4_data *rmi4_data,
+				unsigned char intr_mask));
 
 static inline ssize_t synaptics_rmi4_show_error(struct device *dev,
 		struct device_attribute *attr, char *buf)
