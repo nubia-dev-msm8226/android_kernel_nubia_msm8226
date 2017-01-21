@@ -80,32 +80,6 @@ echo "-----------------"
 echo "Making METRO Kernel:"
 echo "-----------------"
 echo -e "${restore}"
-
-echo -e "${bldblu}"
-while read -p "Which branch (cm/miui)? " mchoice
-echo -e "${bldred}"
-do
-case "$mchoice" in
-	cm|CM )
-		ASSASIN_F="cm"
-		echo
-		echo "Named cm"
-		break
-		;;
-	m|M )
-		ASSASIN_F="miui"
-		echo
-		echo "Named miui"
-		break
-		;;
-	* )
-		echo
-		echo "Invalid try again!"
-		echo
-		;;
-esac
-done
-
 echo -e "${bldgrn}"
 while read -p "Do you want to clean stuff (y/n)? " cchoice
 do
@@ -160,7 +134,7 @@ echo "METRO-$METRO_F-$(date +%d-%m_%H%M)-$VER.zip"
 echo -e "${bldred}"
 echo "################################################################################"
 echo -e "${bldgrn}"
-echo "------------------------Moshi Kernel Compiled in:-------------------------------"
+echo "------------------------Metro Kernel Compiled in:-------------------------------"
 echo -e "${bldred}"
 echo "################################################################################"
 echo -e "${restore}"
