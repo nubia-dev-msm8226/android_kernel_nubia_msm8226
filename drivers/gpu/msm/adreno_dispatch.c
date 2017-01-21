@@ -194,7 +194,6 @@ static inline struct kgsl_cmdbatch *adreno_dispatcher_get_cmdbatch(
 		 * If changes are pending and the canary timer hasn't been
 		 * started yet, start it
 		 */
-<<<<<<< HEAD
 		if (pending) {
 			/*
 			 * If syncpoints are pending start the canary timer if
@@ -211,19 +210,6 @@ static inline struct kgsl_cmdbatch *adreno_dispatcher_get_cmdbatch(
 			spin_unlock(&cmdbatch->lock);
 			del_timer_sync(&cmdbatch->timer);
 		}
-=======
-		if (!timer_pending(&cmdbatch->timer))
-			mod_timer(&cmdbatch->timer, jiffies + msecs_to_jiffies(5000));
-
-		return ERR_PTR(-EAGAIN);
-	}
-
-	/*
-	 * Otherwise, delete the timer to make sure it is good
-	 * and dead before queuing the buffer
-	 */
-	del_timer_sync(&cmdbatch->timer);
->>>>>>> 9662809... msm: kgsl: Fix direct references to HZ
 
 		if (pending) {
 			cmdbatch = ERR_PTR(-EAGAIN);
