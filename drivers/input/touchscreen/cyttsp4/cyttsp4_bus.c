@@ -106,8 +106,12 @@ static int _cyttsp4_register_dev(struct cyttsp4_device *pdev,
 {
 	int ret;
 
-	BUG_ON(bus_find_device(&cyttsp4_bus_type, NULL, &pdev->dev,
-			cyttsp4_match_dev));
+	/* Check if the device is registered with the system */
+	if (bus_find_device(&cyttsp4_bus_type, NULL, &pdev->dev,
+			cyttsp4_match_dev)) {
+		put_device(&pdev->dev);
+		return -EEXIST;
+	}
 
 	pdev->core = core;
 	pdev->dev.parent = get_device(&core->dev);
@@ -147,8 +151,12 @@ static int _cyttsp4_register_core(struct cyttsp4_core *pdev,
 {
 	int ret;
 
-	BUG_ON(bus_find_device(&cyttsp4_bus_type, NULL, &pdev->dev,
-			cyttsp4_match_dev));
+	/* Check if the device is registered with the system */
+	if (bus_find_device(&cyttsp4_bus_type, NULL, &pdev->dev,
+			cyttsp4_match_dev)) {
+		put_device(&pdev->dev);
+		return -EEXIST;
+	}
 
 	pdev->adap = adap;
 	pdev->dev.parent = get_device(adap->dev);
@@ -654,8 +662,8 @@ static int cyttsp4_drv_probe(struct device *_dev)
 	struct cyttsp4_core *core = dev->core;
 	int rc;
 
-	BUG_ON(!core);
-	BUG_ON(!core->dev.driver);
+	if (!core || !core->dev.driver)
+		return -ENODEV;
 
 	/* Increase usage count of the core driver*/
 	__module_get(core->dev.driver->owner);
@@ -674,8 +682,8 @@ static int cyttsp4_core_drv_probe(struct device *_dev)
 	struct cyttsp4_adapter *adap = dev->adap;
 	int rc;
 
-	BUG_ON(!adap);
-	BUG_ON(!adap->dev->driver);
+	if (!adap || !adap->dev->driver)
+		return -ENODEV;
 
 	/* Increase usage count of the adapter driver*/
 	__module_get(adap->dev->driver->owner);
@@ -731,7 +739,7 @@ void cyttsp4_unregister_core_driver(struct cyttsp4_core_driver *drv)
 }
 EXPORT_SYMBOL_GPL(cyttsp4_unregister_core_driver);
 
-int __init cyttsp4_bus_init(void)
+static int __init cyttsp4_bus_init(void)
 {
 	int error;
 	error =  bus_register(&cyttsp4_bus_type);

@@ -50,7 +50,7 @@
 #define CY_SPI_SYNC_ACK		0x62 /* from TRM *A protocol */
 #define CY_SPI_DATA_SIZE	(3 * 256)
 #define CY_SPI_BITS_PER_WORD	8
-#define CY_SPI_MAX_REG		512
+#define CY_SPI_NUM_RETRY	3
 
 #define CY_SPI_MAX_HEADER_BYTES	\
 		max(CY_SPI_WR_HEADER_BYTES, CY_SPI_RD_HEADER_BYTES)
@@ -74,7 +74,7 @@ static void _cyttsp4_spi_pr_buf(struct cyttsp4_spi *ts_spi, u8 *buf,
 }
 
 static int cyttsp4_spi_xfer(u8 op, struct cyttsp4_spi *ts,
-			u8 reg, u8 *buf, int length)
+			u16 reg, u8 *buf, int length)
 {
 	struct device *dev = &ts->client->dev;
 	struct spi_message msg;
@@ -175,25 +175,6 @@ static int cyttsp4_spi_xfer(u8 op, struct cyttsp4_spi *ts,
 		 */
 	}
 
-#if 0
-	/* DEBUG */
-	switch (op) {
-	case CY_SPI_WR_OP:
-		_cyttsp4_spi_pr_buf(ts, wr_hdr_buf, CY_SPI_WR_HEADER_BYTES,
-			"spi_wr_buf HEADER");
-		if (buf)
-			_cyttsp4_spi_pr_buf(ts, buf, length,
-				"spi_wr_buf DATA");
-		break;
-
-	case CY_SPI_RD_OP:
-		_cyttsp4_spi_pr_buf(ts, rd_hdr_buf, CY_SPI_RD_HEADER_BYTES,
-			"spi_rd_buf HEADER");
-		_cyttsp4_spi_pr_buf(ts, buf, length, "spi_rd_buf DATA");
-		break;
-	}
-#endif
-
 	if (rd_hdr_buf[CY_SPI_SYNC_BYTE] != CY_SPI_SYNC_ACK) {
 		/* signal ACK error so silent retry */
 		rc = 1;
@@ -222,93 +203,122 @@ static int cyttsp4_spi_xfer(u8 op, struct cyttsp4_spi *ts,
 			 */
 			break;
 		}
-	} else
-		rc = 0;
+	}
 
 cyttsp4_spi_xfer_exit:
 	return rc;
 }
 
-static s32 cyttsp4_spi_read_block_data(struct cyttsp4_spi *ts, u8 addr,
-				size_t length, void *data)
+static s32 cyttsp4_spi_read_block_data(struct cyttsp4_spi *ts, u16 addr,
+				int length, void *data, int max_xfer)
 {
-	int rc = 0;
+	int rc = -EINVAL;
+	int retry = 0;
+	int trans_len;
 	struct device *dev = &ts->client->dev;
 
 	dev_vdbg(dev, "%s: Enter\n", __func__);
 
-	/* Write address */
-	rc = cyttsp4_spi_xfer(CY_SPI_WR_OP, ts, addr, NULL, 0);
-	if (rc < 0) {
-		dev_err(dev, "%s: Fail write address r=%d\n", __func__, rc);
-		return rc;
+	while (length > 0) {
+		trans_len = min(length, max_xfer);
+
+		/* Write address */
+		rc = cyttsp4_spi_xfer(CY_SPI_WR_OP, ts, addr, NULL, 0);
+		if (rc < 0) {
+			dev_err(dev, "%s: Fail write address r=%d\n",
+				__func__, rc);
+			return rc;
+		}
+
+		/* Read data */
+		rc = cyttsp4_spi_xfer(CY_SPI_RD_OP, ts, addr, data, trans_len);
+		if (rc < 0) {
+			dev_err(dev, "%s: Fail read r=%d\n", __func__, rc);
+			goto exit;
+		} else if (rc > 0) {
+			/* Perform retry or fail */
+			if (retry++ < CY_SPI_NUM_RETRY) {
+				dev_dbg(dev, "%s: ACK error, retry %d\n",
+					__func__, retry);
+				continue;
+			} else {
+				dev_err(dev, "%s: ACK error\n", __func__);
+				rc = -EIO;
+				goto exit;
+			}
+		}
+
+		length -= trans_len;
+		data += trans_len;
+		addr += trans_len;
 	}
-
-	/* Read data */
-	rc = cyttsp4_spi_xfer(CY_SPI_RD_OP, ts, addr, data, length);
-	if (rc < 0) {
-		dev_err(dev, "%s: Fail read r=%d\n", __func__, rc);
-		/*
-		 * Do not print the above error if the data sync bytes
-		 * were not found.
-		 * This is a normal condition for the bootloader loader
-		 * startup and need to retry until data sync bytes are found.
-		 */
-	} else if (rc > 0)
-		/* Now signal fail; so retry can be done */
-		rc = -EIO;
-
+exit:
 	return rc;
 }
 
-static s32 cyttsp4_spi_write_block_data(struct cyttsp4_spi *ts, u8 addr,
-				size_t length, const void *data)
+static s32 cyttsp4_spi_write_block_data(struct cyttsp4_spi *ts, u16 addr,
+				int length, const void *data, int max_xfer)
 {
-	int rc = 0;
+	int rc = -EINVAL;
+	int retry = 0;
+	int trans_len;
 	struct device *dev = &ts->client->dev;
 
 	dev_vdbg(dev, "%s: Enter\n", __func__);
 
-	rc = cyttsp4_spi_xfer(CY_SPI_WR_OP, ts, addr, (void *)data, length);
-	if (rc < 0) {
-		dev_err(dev, "%s: Fail write r=%d\n", __func__, rc);
-		/*
-		 * Do not print the above error if the data sync bytes
-		 * were not found.
-		 * This is a normal condition for the bootloader loader
-		 * startup and need to retry until data sync bytes are found.
-		 */
-	} else if (rc > 0)
-		/* Now signal fail; so retry can be done */
-		rc = -EIO;
+	while (length > 0) {
+		trans_len = min(length, max_xfer);
 
+		rc = cyttsp4_spi_xfer(CY_SPI_WR_OP, ts, addr, (void *)data,
+				trans_len);
+		if (rc < 0) {
+			dev_err(dev, "%s: Fail write r=%d\n", __func__, rc);
+			goto exit;
+		} else if (rc > 0) {
+			/* Perform retry or fail */
+			if (retry++ < CY_SPI_NUM_RETRY) {
+				dev_dbg(dev, "%s: ACK error, retry %d\n",
+					__func__, retry);
+				continue;
+			} else {
+				dev_err(dev, "%s: ACK error\n", __func__);
+				rc = -EIO;
+				goto exit;
+			}
+		}
+
+		length -= trans_len;
+		data += trans_len;
+		addr += trans_len;
+	}
+exit:
 	return rc;
 }
 
-static int cyttsp4_spi_write(struct cyttsp4_adapter *adap, u8 addr,
-		const void *buf, int size)
+static int cyttsp4_spi_write(struct cyttsp4_adapter *adap, u16 addr,
+		const void *buf, int size, int max_xfer)
 {
 	struct cyttsp4_spi *ts = dev_get_drvdata(adap->dev);
 	int rc;
 
 	pm_runtime_get_noresume(adap->dev);
 	mutex_lock(&ts->lock);
-	rc = cyttsp4_spi_write_block_data(ts, addr, size, buf);
+	rc = cyttsp4_spi_write_block_data(ts, addr, size, buf, max_xfer);
 	mutex_unlock(&ts->lock);
 	pm_runtime_put_noidle(adap->dev);
 
 	return rc;
 }
 
-static int cyttsp4_spi_read(struct cyttsp4_adapter *adap, u8 addr,
-		void *buf, int size)
+static int cyttsp4_spi_read(struct cyttsp4_adapter *adap, u16 addr,
+		void *buf, int size, int max_xfer)
 {
 	struct cyttsp4_spi *ts = dev_get_drvdata(adap->dev);
 	int rc;
 
 	pm_runtime_get_noresume(adap->dev);
 	mutex_lock(&ts->lock);
-	rc = cyttsp4_spi_read_block_data(ts, addr, size, buf);
+	rc = cyttsp4_spi_read_block_data(ts, addr, size, buf, max_xfer);
 	mutex_unlock(&ts->lock);
 	pm_runtime_put_noidle(adap->dev);
 

@@ -36,69 +36,12 @@
 #define CYTTSP4_INPUT_ELEM_SZ (sizeof("0xHH") + 1)
 #define CYTTSP4_TCH_PARAM_SIZE_BLK_SZ 128
 
-/* Timeout values in milliseconds */
+/* Timeout values in ms. */
 #define CY_DA_REQUEST_EXCLUSIVE_TIMEOUT	500
-#define CY_DA_COMMAND_COMPLETE_TIMEOUT	500
-
-/* Command Sizes and expected Return Sizes */
-/*
- * 1: Command
- */
-#define CY_CMD_CAT_GET_CFG_BLK_SZ_CMD_SZ 1
-
-/*
- * 2: Row Size
- */
-#define CY_CMD_CAT_GET_CFG_BLK_SZ_RET_SZ 2
-
-/*
- * 1: Command
- * 2: Offset
- * 2: Length
- * 1: EBID
- */
-#define CY_CMD_CAT_READ_CFG_BLK_CMD_SZ 6
-
-/*
- * 1: Complete bit
- * 1: EBID
- * 2: Read Length
- * 1: Reserved
- * N: EBID Row Size
- * 2: CRC
- */
-#define CY_CMD_CAT_READ_CFG_BLK_RET_SZ 7
-#define CY_CMD_CAT_READ_CFG_BLK_RET_HDR_SZ 5
 
 struct cyttsp4_device_access_platform_data {
 	char const *device_access_dev_name;
 };
-
-/*
- * 1: Command
- */
-#define CY_CMD_CAT_EXEC_SCAN_CMD_SZ 1
-
-/*
- * 1: Status
- */
-#define CY_CMD_CAT_EXEC_SCAN_RET_SZ 1
-
-/*
- * 1: Command
- * 2: Read offset
- * 2: Num Element
- * 1: Data ID
- */
-#define CY_CMD_CAT_RET_PANEL_DATA_CMD_SZ 6
-
-/*
- * 1: Status
- * 1: Data ID
- * 2: Num Element
- * 1: Data ID
- */
-#define CY_CMD_CAT_RET_PANEL_DATA_RET_SZ 5
 
 #define CY_CMD_IN_DATA_OFFSET_VALUE 0
 
@@ -109,11 +52,7 @@ struct cyttsp4_device_access_platform_data {
 
 #define CY_CMD_RET_PANEL_ELMNT_SZ_MASK 0x07
 
-#define CY_CMD_STATUS_SUCCESS 0
-
-#define I2C_BUF_MAX_SIZE 512
-
-enum scanDataTypeList {
+enum cyttsp4_scan_data_type {
 	CY_MUT_RAW,
 	CY_MUT_BASE,
 	CY_MUT_DIFF,

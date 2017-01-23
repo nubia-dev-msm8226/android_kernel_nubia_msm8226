@@ -54,86 +54,72 @@ struct cyttsp4_btn_data {
 	struct input_dev *input;
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend es;
-	bool is_suspended;
 #endif
+	struct mutex report_lock;
+	bool is_suspended;
 	bool input_device_registered;
 	char phys[NAME_MAX];
 	u8 pr_buf[CY_MAX_PRBUF_SIZE];
 };
 
-static void cyttsp4_btn_key_action(struct cyttsp4_btn_data *bd,
-	int cur_btn, u8 cur_btn_mask, int num_btns, int new_btn_state)
+
+static inline void cyttsp4_btn_key_action(struct cyttsp4_btn_data *bd,
+	int btn_no, int btn_state)
 {
 	struct device *dev = &bd->ttsp->dev;
 	struct cyttsp4_sysinfo *si = bd->si;
-	int btn;
-	int cur_btn_state;
 
-	cur_btn_state = new_btn_state == CY_BTN_PRESSED ? CY_BTN_RELEASED :
-		CY_BTN_PRESSED;
+	if (!si->btn[btn_no].enabled ||
+			si->btn[btn_no].state == btn_state)
+		return;
 
-	for (btn = 0; btn < num_btns; btn++) {
-		if ((si->btn[cur_btn + btn].enabled) &&
-			(((cur_btn_mask >> (btn * CY_BITS_PER_BTN)) &
-			(CY_NUM_BTN_EVENT_ID - 1)) == new_btn_state) &&
-			(si->btn[cur_btn + btn].state == cur_btn_state)) {
-			input_report_key(bd->input, si->btn
-				[cur_btn + btn].key_code, new_btn_state);
-			si->btn[cur_btn + btn].state = new_btn_state;
-			input_sync(bd->input);
-			dev_dbg(dev, "%s: btn=%d key_code=%d %s\n", __func__,
-				cur_btn + btn, si->btn[cur_btn + btn].key_code,
-				new_btn_state == CY_BTN_PRESSED ?
-				"PRESSED" : "RELEASED");
-		}
-	}
-	return;
+	si->btn[btn_no].state = btn_state;
+	input_report_key(bd->input, si->btn[btn_no].key_code, btn_state);
+	input_sync(bd->input);
+
+	dev_dbg(dev, "%s: btn=%d key_code=%d %s\n", __func__,
+		btn_no, si->btn[btn_no].key_code,
+		btn_state == CY_BTN_PRESSED ?
+			"PRESSED" : "RELEASED");
 }
 
 static void cyttsp4_get_btn_touches(struct cyttsp4_btn_data *bd)
 {
-	enum cyttsp4_btn_state btn_state = CY_BTN_RELEASED;
 	struct cyttsp4_sysinfo *si = bd->si;
-	int num_btn;
-	int num_cur_btn;
+	int num_btn_regs = si->si_ofs.num_btn_regs;
+	int num_btns = si->si_ofs.num_btns;
 	int cur_reg;
+	int cur_reg_val;
 	int cur_btn;
-	u8 cur_btn_mask;
+	int cur_btn_state;
+	int i;
 
-	for (btn_state = CY_BTN_RELEASED; btn_state < CY_BTN_NUM_STATE;
-		btn_state++) {
-		for (cur_reg = cur_btn = 0, num_cur_btn = si->si_ofs.num_btns;
-			cur_reg < si->si_ofs.num_btn_regs;
-			cur_reg++, cur_btn += CY_NUM_BTN_PER_REG,
-			num_cur_btn -= CY_NUM_BTN_PER_REG) {
-			if (num_cur_btn > 0) {
-				cur_btn_mask = si->xy_mode[si->si_ofs.rep_ofs +
-					 2 + cur_reg];
-				num_btn = num_cur_btn / CY_NUM_BTN_PER_REG ?
-					CY_NUM_BTN_PER_REG : num_cur_btn;
-				cyttsp4_btn_key_action(bd, cur_btn,
-					cur_btn_mask, num_btn, btn_state);
-			}
+	for (cur_btn = 0, cur_reg = 0; cur_reg < num_btn_regs; cur_reg++) {
+		cur_reg_val = si->xy_mode[si->si_ofs.rep_ofs + 2 + cur_reg];
+
+		for (i = 0; i < CY_NUM_BTN_PER_REG && cur_btn < num_btns;
+				i++, cur_btn++) {
+			/* Get current button state */
+			cur_btn_state = cur_reg_val &
+					((1 << CY_BITS_PER_BTN) - 1);
+			/* Shift reg value for next iteration */
+			cur_reg_val >>= CY_BITS_PER_BTN;
+
+			cyttsp4_btn_key_action(bd, cur_btn, cur_btn_state);
 		}
 	}
-	return;
 }
 
 static void cyttsp4_btn_lift_all(struct cyttsp4_btn_data *bd)
 {
 	struct cyttsp4_sysinfo *si = bd->si;
-	int btn_reg;
-	int num_regs;
-	if (si->si_ofs.num_btns == 0)
+	int i;
+
+	if (!si || si->si_ofs.num_btns == 0)
 		return;
 
-	num_regs = (si->si_ofs.num_btns + CY_NUM_BTN_PER_REG - 1)
-			/ CY_NUM_BTN_PER_REG;
-
-	for (btn_reg = 0; btn_reg < num_regs; btn_reg++)
-		si->xy_mode[si->si_ofs.rep_ofs + 2 + btn_reg] = 0;
-
-	cyttsp4_get_btn_touches(bd);
+	for (i = 0; i < si->si_ofs.num_btns; i++)
+		cyttsp4_btn_key_action(bd, i, CY_BTN_RELEASED);
 }
 
 #ifdef VERBOSE_DEBUG
@@ -208,8 +194,15 @@ static int cyttsp4_btn_attention(struct cyttsp4_device *ttsp)
 
 	dev_vdbg(dev, "%s\n", __func__);
 
-	/* core handles handshake */
-	rc = cyttsp4_xy_worker(bd);
+	mutex_lock(&bd->report_lock);
+	if (!bd->is_suspended) {
+		/* core handles handshake */
+		rc = cyttsp4_xy_worker(bd);
+	} else {
+		dev_vdbg(dev, "%s: Ignoring report while suspended\n",
+			__func__);
+	}
+	mutex_unlock(&bd->report_lock);
 	if (rc < 0)
 		dev_err(dev, "%s: xy_worker error r=%d\n", __func__, rc);
 
@@ -220,18 +213,17 @@ static int cyttsp4_startup_attention(struct cyttsp4_device *ttsp)
 {
 	struct device *dev = &ttsp->dev;
 	struct cyttsp4_btn_data *bd = dev_get_drvdata(dev);
-	struct cyttsp4_sysinfo *si = bd->si;
-	int btn;
 
 	dev_vdbg(dev, "%s\n", __func__);
 
-	for (btn = 0; btn < si->si_ofs.num_btns; btn++)
-		bd->si->btn[btn].state = CY_BTN_RELEASED;
+	mutex_lock(&bd->report_lock);
+	cyttsp4_btn_lift_all(bd);
+	mutex_unlock(&bd->report_lock);
 
 	return 0;
 }
 
-int cyttsp4_btn_open(struct input_dev *input)
+static int cyttsp4_btn_open(struct input_dev *input)
 {
 	struct device *dev = input->dev.parent;
 	struct cyttsp4_device *ttsp =
@@ -239,7 +231,7 @@ int cyttsp4_btn_open(struct input_dev *input)
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	pm_runtime_get_sync(dev);
+	pm_runtime_get(dev);
 
 	dev_vdbg(dev, "%s: setup subscriptions\n", __func__);
 
@@ -254,16 +246,13 @@ int cyttsp4_btn_open(struct input_dev *input)
 	return 0;
 }
 
-void cyttsp4_btn_close(struct input_dev *input)
+static void cyttsp4_btn_close(struct input_dev *input)
 {
 	struct device *dev = input->dev.parent;
-	struct cyttsp4_btn_data *bd = dev_get_drvdata(dev);
 	struct cyttsp4_device *ttsp =
 		container_of(dev, struct cyttsp4_device, dev);
 
 	dev_dbg(dev, "%s\n", __func__);
-
-	cyttsp4_btn_lift_all(bd);
 
 	cyttsp4_unsubscribe_attention(ttsp, CY_ATTEN_IRQ,
 		cyttsp4_btn_attention, CY_MODE_OPERATIONAL);
@@ -283,11 +272,14 @@ static void cyttsp4_btn_early_suspend(struct early_suspend *h)
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	if (bd->si)
-		cyttsp4_btn_lift_all(bd);
-	pm_runtime_put(dev);
-
+#ifndef CONFIG_PM_RUNTIME
+	mutex_lock(&bd->report_lock);
 	bd->is_suspended = true;
+	cyttsp4_btn_lift_all(bd);
+	mutex_unlock(&bd->report_lock);
+#endif
+
+	pm_runtime_put(dev);
 }
 
 static void cyttsp4_btn_late_resume(struct early_suspend *h)
@@ -298,9 +290,13 @@ static void cyttsp4_btn_late_resume(struct early_suspend *h)
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	pm_runtime_get_sync(dev);
-
+#ifndef CONFIG_PM_RUNTIME
+	mutex_lock(&bd->report_lock);
 	bd->is_suspended = false;
+	mutex_unlock(&bd->report_lock);
+#endif
+
+	pm_runtime_get(dev);
 }
 #endif
 
@@ -311,14 +307,23 @@ static int cyttsp4_btn_suspend(struct device *dev)
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	if (bd->si)
-		cyttsp4_btn_lift_all(bd);
+	mutex_lock(&bd->report_lock);
+	bd->is_suspended = true;
+	cyttsp4_btn_lift_all(bd);
+	mutex_unlock(&bd->report_lock);
+
 	return 0;
 }
 
 static int cyttsp4_btn_resume(struct device *dev)
 {
+	struct cyttsp4_btn_data *bd = dev_get_drvdata(dev);
+
 	dev_dbg(dev, "%s\n", __func__);
+
+	mutex_lock(&bd->report_lock);
+	bd->is_suspended = false;
+	mutex_unlock(&bd->report_lock);
 
 	return 0;
 }
@@ -381,6 +386,12 @@ static int cyttsp4_btn_probe(struct cyttsp4_device *ttsp)
 	dev_dbg(dev, "%s: debug on\n", __func__);
 	dev_vdbg(dev, "%s: verbose debug on\n", __func__);
 
+	if (pdata == NULL) {
+		dev_err(dev, "%s: Missing platform data\n", __func__);
+		rc = -ENODEV;
+		goto error_no_pdata;
+	}
+
 	bd = kzalloc(sizeof(*bd), GFP_KERNEL);
 	if (bd == NULL) {
 		dev_err(dev, "%s: Error, kzalloc\n", __func__);
@@ -388,6 +399,7 @@ static int cyttsp4_btn_probe(struct cyttsp4_device *ttsp)
 		goto error_alloc_data_failed;
 	}
 
+	mutex_init(&bd->report_lock);
 	bd->ttsp = ttsp;
 	bd->pdata = pdata;
 	dev_set_drvdata(dev, bd);
@@ -411,12 +423,9 @@ static int cyttsp4_btn_probe(struct cyttsp4_device *ttsp)
 	input_set_drvdata(bd->input, bd);
 
 	pm_runtime_enable(dev);
-	pm_runtime_get_sync(dev);
 
 	/* get sysinfo */
 	bd->si = cyttsp4_request_sysinfo(ttsp);
-	pm_runtime_put(dev);
-
 	if (bd->si) {
 		rc = cyttsp4_setup_input_device(ttsp);
 		if (rc)
@@ -446,6 +455,7 @@ error_alloc_failed:
 	dev_set_drvdata(dev, NULL);
 	kfree(bd);
 error_alloc_data_failed:
+error_no_pdata:
 	dev_err(dev, "%s failed.\n", __func__);
 	return rc;
 }
@@ -484,7 +494,7 @@ static int cyttsp4_btn_release(struct cyttsp4_device *ttsp)
 	return 0;
 }
 
-struct cyttsp4_driver cyttsp4_btn_driver = {
+static struct cyttsp4_driver cyttsp4_btn_driver = {
 	.probe = cyttsp4_btn_probe,
 	.remove = cyttsp4_btn_release,
 	.driver = {

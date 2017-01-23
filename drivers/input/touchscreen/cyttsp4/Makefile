@@ -4,7 +4,7 @@
 
 # Each configuration option enables a list of files.
 
-obj-$(CONFIG_CYPRSS_TOUCHSCREEN_TMA463) += zte_ctp.o
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_TMA463) += zte_ctp.o
 obj-$(CONFIG_CYPRESS_CYTTSP4_BUS) += cyttsp4_bus.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4)	+= cyttsp4_core.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_I2C)	+= cyttsp4_i2c.o
@@ -14,7 +14,9 @@ cyttsp4_mt_a-y := cyttsp4_mta.o cyttsp4_mt_common.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_MT_B)	+= cyttsp4_mt_b.o
 cyttsp4_mt_b-y := cyttsp4_mtb.o cyttsp4_mt_common.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_BUTTON)	+= cyttsp4_btn.o
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_PROXIMITY)	+= cyttsp4_proximity.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_DEVICE_ACCESS)	+= cyttsp4_device_access.o
+obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_TEST_DEVICE_ACCESS_API)	+= cyttsp4_test_device_access_api.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_LOADER)	+= cyttsp4_loader.o
 obj-$(CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_DEBUG_MODULE)	+= cyttsp4_debug.o
 
@@ -29,6 +31,7 @@ CFLAGS_cyttsp4_mt_a.o += -DDEBUG
 CFLAGS_cyttsp4_mt_b.o += -DDEBUG
 CFLAGS_cyttsp4_mt_common.o += -DDEBUG
 CFLAGS_cyttsp4_btn.o += -DDEBUG
+CFLAGS_cyttsp4_proximity.o += -DDEBUG
 CFLAGS_cyttsp4_device_access.o += -DDEBUG
 CFLAGS_cyttsp4_loader.o += -DDEBUG
 CFLAGS_cyttsp4_debug.o += -DDEBUG
@@ -45,6 +48,7 @@ CFLAGS_cyttsp4_mt_a.o += -DVERBOSE_DEBUG
 CFLAGS_cyttsp4_mt_b.o += -DVERBOSE_DEBUG
 CFLAGS_cyttsp4_mt_common.o += -DVERBOSE_DEBUG
 CFLAGS_cyttsp4_btn.o += -DVERBOSE_DEBUG
+CFLAGS_cyttsp4_proximity.o += -DVERBOSE_DEBUG
 CFLAGS_cyttsp4_device_access.o += -DVERBOSE_DEBUG
 CFLAGS_cyttsp4_loader.o += -DVERBOSE_DEBUG
 CFLAGS_cyttsp4_debug.o += -DVERBOSE_DEBUG

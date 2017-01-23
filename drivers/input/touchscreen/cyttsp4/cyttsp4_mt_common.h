@@ -54,12 +54,13 @@ struct cyttsp4_mt_function {
 	int (*mt_release)(struct cyttsp4_device *ttsp);
 	int (*mt_probe)(struct cyttsp4_device *ttsp,
 			struct cyttsp4_mt_data *md);
-	void (*report_slot_liftoff)(struct cyttsp4_mt_data *md);
+	void (*report_slot_liftoff)(struct cyttsp4_mt_data *md, int max_slots);
 	void (*input_sync)(struct input_dev *input);
-	void (*input_report)(struct input_dev *input, int sig, int t);
-	void (*final_sync)(struct input_dev *input, int max_tchs,
-			int mt_sync_count, int *ids);
-	int (*input_register_device)(struct input_dev *input, int max_tchs);
+	void (*input_report)(struct input_dev *input, int sig, int t,
+			int type);
+	void (*final_sync)(struct input_dev *input, int max_slots,
+			int mt_sync_count, unsigned long *ids);
+	int (*input_register_device)(struct input_dev *input, int max_slots);
 };
 
 struct cyttsp4_mt_data {
@@ -75,7 +76,7 @@ struct cyttsp4_mt_data {
 	bool is_suspended;
 	bool input_device_registered;
 	char phys[NAME_MAX];
-	int num_prv_tch;
+	int num_prv_rec; /* Number of previous touch records */
 	int prv_tch_type;
 #ifdef VERBOSE_DEBUG
 	u8 pr_buf[CY_MAX_PRBUF_SIZE];

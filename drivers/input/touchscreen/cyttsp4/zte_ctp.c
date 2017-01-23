@@ -3,9 +3,9 @@
   Copyright (C), 2001-2012, ZTE. Co., Ltd.
 
  ******************************************************************************
-  File Name     : V5-ctp.c
-  Version       : Initial Draft
-  Author        : LiuYongfeng
+  File Name     : zte-ctp.c
+  Version        : Initial Draft
+  Author         : LiuYongfeng
   Created       : 2012/10/6
   Last Modified :
   Description   : This is touchscreen driver board file
@@ -36,16 +36,16 @@
 #include <linux/i2c.h>
 
 
-#ifdef CONFIG_CYPRSS_TOUCHSCREEN_TMA463
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_TMA463
 /* cyttsp */
 #include "cyttsp4_bus.h"
 #include "cyttsp4_core.h"
 #include "cyttsp4_btn.h"
 #include "cyttsp4_mt.h"
 #include "cyttsp4_regs.h"
-#define CYTTSP4_USE_I2C
+#include "cyttsp4_proximity.h"
 
-#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_INCLUDE_FW
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_PLATFORM_FW_UPGRADE
 #include "cyttsp4_img.h"
 static struct cyttsp4_touch_firmware cyttsp4_firmware = {
 	.img = cyttsp4_img,
@@ -62,7 +62,7 @@ static struct cyttsp4_touch_firmware cyttsp4_firmware = {
 };
 #endif
 
-#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_AUTO_LOAD_TOUCH_PARAMS
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP4_PLATFORM_TTCONFIG_UPGRADE
 static struct touch_settings cyttsp4_sett_param_regs = {
 	.data = (uint8_t *)&cyttsp4_param_regs[0],
 	.size = ARRAY_SIZE(cyttsp4_param_regs),
@@ -74,26 +74,30 @@ static struct touch_settings cyttsp4_sett_param_size = {
 	.size = ARRAY_SIZE(cyttsp4_param_size),
 	.tag = 0,
 };
-#else
-static struct touch_settings cyttsp4_sett_param_regs = {
-	.data = NULL,
-	.size = 0,
-	.tag = 0,
-};
 
-static struct touch_settings cyttsp4_sett_param_size = {
-	.data = NULL,
-	.size = 0,
-	.tag = 0,
+static struct cyttsp4_touch_config cyttsp4_ttconfig = {
+	.param_regs = &cyttsp4_sett_param_regs,
+	.param_size = &cyttsp4_sett_param_size,
+	.fw_ver = ttconfig_fw_ver,
+	.fw_vsize = ARRAY_SIZE(ttconfig_fw_ver),
+};
+#else
+static struct cyttsp4_touch_config cyttsp4_ttconfig = {
+	.param_regs = NULL,
+	.param_size = NULL,
+	.fw_ver = NULL,
+	.fw_vsize = 0,
 };
 #endif
 
 static struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {
 	.fw = &cyttsp4_firmware,
-	.param_regs = &cyttsp4_sett_param_regs,
-	.param_size = &cyttsp4_sett_param_size,
-	.flags = 0,
+	.ttconfig = &cyttsp4_ttconfig,
+	.flags = CY_LOADER_FLAG_NONE,
 };
+
+#define CYTTSP4_USE_I2C
+/* #define CYTTSP4_USE_SPI */
 
 #ifdef CYTTSP4_USE_I2C
 #define CYTTSP4_I2C_NAME "cyttsp4_i2c_adapter"
@@ -122,16 +126,22 @@ static struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {
 #endif
 #endif
 
-#ifdef CONFIG_CYTTSP4_5P0_INCH_OTG_GW //goworld 5 inch otg tp for NX501/NX502
+#ifdef CONFIG_CYTTSP4_5P5_INCH_OTG_GW //goworld 5.5 inch NX505J
 #define CY_MAXX 1080
 #define CY_MAXY 1920
-#define CYTTSP4_FIRMEARE_VERSION    0x0000
+#define CYTTSP4_FIRMEARE_VERSION    0x0809
+#endif
+
+#ifdef CONFIG_CYTTSP4_5P0_INCH_OTG_GW //goworld 5 inch otg tp for NX501
+#define CY_MAXX 1080
+#define CY_MAXY 1920
+#define CYTTSP4_FIRMEARE_VERSION    0x030E
 #endif
 
 #ifdef CONFIG_CYTTSP4_4P7_INCH_OTG_GW
 #define CY_MAXX 720
 #define CY_MAXY 1280
-#define CYTTSP4_FIRMEARE_VERSION    0x060F
+#define CYTTSP4_FIRMEARE_VERSION    0x0611
 #endif
 #define CY_MINX 0
 #define CY_MINY 0
@@ -144,14 +154,14 @@ static struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {
 #define CY_ABS_MAX_P 255
 #define CY_ABS_MIN_W 0
 #define CY_ABS_MAX_W 255
+#define CY_PROXIMITY_MIN_VAL	0
+#define CY_PROXIMITY_MAX_VAL	1
 
 #define CY_ABS_MIN_T 0
 
 #define CY_ABS_MAX_T 15
 
 #define CY_IGNORE_VALUE 0xFFFF
-
-//#define CYTTSP4_VIRTUAL_KEYS
 
 static int cyttsp4_xres(struct cyttsp4_core_platform_data *pdata,
 		struct device *dev)
@@ -165,7 +175,9 @@ static int cyttsp4_xres(struct cyttsp4_core_platform_data *pdata,
 	msleep(40);
 	gpio_set_value(rst_gpio, 1);
 	msleep(20);
-
+	dev_dbg(dev,
+		"%s: RESET CYTTSP gpio=%d r=%d\n", __func__,
+		pdata->rst_gpio, rc);
 	return rc;
 }
 
@@ -202,6 +214,10 @@ static int cyttsp4_init(struct cyttsp4_core_platform_data *pdata,
 		gpio_free(rst_gpio);
 		gpio_free(irq_gpio);
 	}
+
+	dev_dbg(dev,
+		"%s: INIT CYTTSP RST gpio=%d and IRQ gpio=%d r=%d\n",
+		__func__, rst_gpio, irq_gpio, rc);
 	return rc;
 }
 
@@ -292,35 +308,39 @@ static int cyttsp_check_version(struct cyttsp4_sysinfo *si)
     u16 fw_ver;
     u16 fw_ver_new;
     
-    if (!si) {
-        printk("%s NULL Pointer detected!\n",__func__);
-        WARN_ON(1);
-        return -EINVAL;
-    }
+	if (!si) {
+		printk("%s NULL Pointer detected!\n",__func__);
+		WARN_ON(1);
+		return -EINVAL;
+	}
     
     si->fw_ver_new = CYTTSP4_FIRMEARE_VERSION;
-
-    fw_ver = si->fw_ver & 0x000F; 
+#if 0
+	/*Discard 0x0309 0x030A 0x030C,back to 0x0308 */
+	if (si->fw_ver == 0x0309 || si->fw_ver == 0x030A || \
+		si->fw_ver == 0x030C|| si->fw_ver == 0x030D)
+		return 1;
+#endif
+	fw_ver = si->fw_ver & 0x000F; 
     fw_ver_new = si->fw_ver_new & 0x000F;
 
-    if ((si->fw_ver >> 4) == (si->fw_ver_new >> 4)) {
+	if ((si->fw_ver >> 4) == (si->fw_ver_new >> 4)) {
         if (fw_ver_new  == fw_ver) {/*equal*/
-            return 0;
-        }
+        	return 0;
+    	}
         else if (fw_ver_new > fw_ver) {
-            return 1;
-        }
+    		return 1;
+    	}
         else {
-            return -1;
+    	    return -1;
         }
-    }
+	}
     else
     {
-        printk("%s: FW didn't match, will NOT upgarde!\n", __func__);
-        return -1;
+		printk("%s: FW didn't match, will NOT upgarde!\n", __func__);
+		return -1;
     }
 }
-
 
 
 /* Button to keycode conversion */
@@ -363,8 +383,8 @@ static struct cyttsp4_core_platform_data _cyttsp4_core_platform_data = {
 		NULL,	/* Cypress Data Record */
 		NULL,	/* Test Record */
 		NULL,	/* Panel Configuration Record */
-		NULL, /* &cyttsp4_sett_param_regs, */
-		NULL, /* &cyttsp4_sett_param_size, */
+		NULL,	/* &cyttsp4_sett_param_regs, */
+		NULL,	/* &cyttsp4_sett_param_size, */
 		NULL,	/* Reserved */
 		NULL,	/* Reserved */
 		NULL,	/* Operational Configuration Record */
@@ -374,6 +394,13 @@ static struct cyttsp4_core_platform_data _cyttsp4_core_platform_data = {
 		&cyttsp4_sett_btn_keys,	/* button-to-keycode table */
 	},
 	.loader_pdata = &_cyttsp4_loader_platform_data,
+	.flags = CY_CORE_FLAG_WAKE_ON_GESTURE,
+	.easy_wakeup_gesture = CY_CORE_EWG_NONE,
+//	.easy_wakeup_gesture = CY_CORE_EWG_TAP_TAP,
+	/* ZTEMT Modify by luochangyang 2013.08.08
+	.easy_wakeup_gesture = CY_CORE_EWG_TAP_TAP
+		| CY_CORE_EWG_TWO_FINGER_SLIDE,
+      */
 };
 
 static struct cyttsp4_core_info cyttsp4_core_info __initdata = {
@@ -382,7 +409,6 @@ static struct cyttsp4_core_info cyttsp4_core_info __initdata = {
 	.adap_id = CYTTSP4_I2C_NAME,
 	.platform_data = &_cyttsp4_core_platform_data,
 };
-
 
 static const uint16_t cyttsp4_abs[] = {
 	ABS_MT_POSITION_X, CY_ABS_MIN_X, CY_ABS_MAX_X, 0, 0,
@@ -405,6 +431,8 @@ static struct cyttsp4_mt_platform_data _cyttsp4_mt_platform_data = {
 	.frmwrk = &cyttsp4_framework,
 	.flags = 0x00,//0x38,yfliu
 	.inp_dev_name = CYTTSP4_MT_NAME,
+	.vkeys_x = CY_VKEYS_X,
+	.vkeys_y = CY_VKEYS_Y,
 };
 
 struct cyttsp4_device_info cyttsp4_mt_info __initdata = {
@@ -412,7 +440,6 @@ struct cyttsp4_device_info cyttsp4_mt_info __initdata = {
 	.core_id = "main_ttsp_core",
 	.platform_data = &_cyttsp4_mt_platform_data,
 };
-
 
 static struct cyttsp4_btn_platform_data _cyttsp4_btn_platform_data = {
 	.inp_dev_name = CYTTSP4_BTN_NAME,
@@ -424,6 +451,26 @@ struct cyttsp4_device_info cyttsp4_btn_info __initdata = {
 	.platform_data = &_cyttsp4_btn_platform_data,
 };
 
+static const uint16_t cyttsp4_prox_abs[] = {
+	ABS_DISTANCE, CY_PROXIMITY_MIN_VAL, CY_PROXIMITY_MAX_VAL, 0, 0,
+};
+
+struct touch_framework cyttsp4_prox_framework = {
+	.abs = (uint16_t *)&cyttsp4_prox_abs[0],
+	.size = ARRAY_SIZE(cyttsp4_prox_abs),
+};
+
+static struct cyttsp4_proximity_platform_data
+		_cyttsp4_proximity_platform_data = {
+	.frmwrk = &cyttsp4_prox_framework,
+	.inp_dev_name = CYTTSP4_PROXIMITY_NAME,
+};
+
+struct cyttsp4_device_info cyttsp4_proximity_info __initdata = {
+	.name = CYTTSP4_PROXIMITY_NAME,
+	.core_id = "main_ttsp_core",
+	.platform_data = &_cyttsp4_proximity_platform_data,
+};
 
 #ifdef CYTTSP4_VIRTUAL_KEYS
 static ssize_t cyttps4_virtualkeys_show(struct kobject *kobj,
@@ -458,16 +505,19 @@ static struct attribute_group cyttsp4_properties_attr_group = {
 	.attrs = cyttsp4_properties_attrs,
 };
 #endif
-static void __init cyttsp4_i2c_device_init(void)
+static int __init cyttsp4_i2c_device_init(void)
 {
+	int ret = 0;
 #ifdef CYTTSP4_VIRTUAL_KEYS
 	struct kobject *properties_kobj;
-	int ret = 0;
 #endif
+    pr_debug("%s: Start...\n", __func__);
+
 	/* Register core and devices */
 	cyttsp4_register_core_device(&cyttsp4_core_info);
-	cyttsp4_register_device(&cyttsp4_mt_info);
-	cyttsp4_register_device(&cyttsp4_btn_info);
+    cyttsp4_register_device(&cyttsp4_mt_info);
+    cyttsp4_register_device(&cyttsp4_btn_info);
+    cyttsp4_register_device(&cyttsp4_proximity_info);
 
 #ifdef CYTTSP4_VIRTUAL_KEYS
 	properties_kobj = kobject_create_and_add("board_properties", NULL);
@@ -477,6 +527,7 @@ static void __init cyttsp4_i2c_device_init(void)
 	if (!properties_kobj || ret)
 		pr_err("%s: failed to create board_properties\n", __func__);
 #endif
+    return ret;
 }
 
 #ifndef CONFIG_OF
@@ -494,8 +545,8 @@ static int  __init zte_init_ctp(void)
 {
 	int ret = 0;
 
-#ifdef CONFIG_CYPRSS_TOUCHSCREEN_TMA463
-	cyttsp4_i2c_device_init();
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_TMA463
+	ret = cyttsp4_i2c_device_init();
 
 #ifndef CONFIG_OF
 	ret = i2c_register_board_info(2,

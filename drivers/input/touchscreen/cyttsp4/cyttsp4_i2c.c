@@ -54,71 +54,111 @@
 struct cyttsp4_i2c {
 	struct i2c_client *client;
 	u8 wr_buf[CY_I2C_DATA_SIZE];
-	struct hrtimer timer;
 	struct mutex lock;
-	atomic_t timeout;
 };
 
-static int cyttsp4_i2c_read_block_data(struct cyttsp4_i2c *ts_i2c, u8 addr,
-	size_t length, void *values)
+static int cyttsp4_i2c_read_block_data(struct cyttsp4_i2c *ts_i2c, u16 addr,
+		int length, void *values, int max_xfer)
 {
-	int rc;
+	int rc = -EINVAL;
+	int trans_len;
+	u8 client_addr;
+	u8 addr_lo;
+	struct i2c_msg msgs[2];
 
-	/* write addr */
-	rc = i2c_master_send(ts_i2c->client, &addr, sizeof(addr));
-	if (rc < 0)
-		return rc;
-	else if (rc != sizeof(addr))
-		return -EIO;
+	while (length > 0) {
+		client_addr = ts_i2c->client->addr | ((addr >> 8) & 0x1);
+		addr_lo = addr & 0xFF;
+		trans_len = min(length, max_xfer);
 
-	/* read data */
-	rc = i2c_master_recv(ts_i2c->client, values, length);
+		memset(msgs, 0, sizeof(msgs));
+		msgs[0].addr = client_addr;
+		msgs[0].flags = 0;
+		msgs[0].len = 1;
+		msgs[0].buf = &addr_lo;
 
-	return (rc < 0) ? rc : rc != length ? -EIO : 0;
+		msgs[1].addr = client_addr;
+		msgs[1].flags = I2C_M_RD;
+		msgs[1].len = trans_len;
+		msgs[1].buf = values;
+
+		rc = i2c_transfer(ts_i2c->client->adapter, msgs, 2);
+		if (rc != 2)
+			goto exit;
+
+		length -= trans_len;
+		values += trans_len;
+		addr += trans_len;
+	}
+
+exit:
+	return (rc < 0) ? rc : rc != ARRAY_SIZE(msgs) ? -EIO : 0;
 }
 
-static int cyttsp4_i2c_write_block_data(struct cyttsp4_i2c *ts_i2c, u8 addr,
-	size_t length, const void *values)
+static int cyttsp4_i2c_write_block_data(struct cyttsp4_i2c *ts_i2c, u16 addr,
+		int length, const void *values, int max_xfer)
 {
-	int rc;
+	int rc = -EINVAL;
+	u8 client_addr;
+	u8 addr_lo;
+	int trans_len;
+	struct i2c_msg msg;
 
 	if (sizeof(ts_i2c->wr_buf) < (length + 1))
 		return -ENOMEM;
 
-	ts_i2c->wr_buf[0] = addr;
-	memcpy(&ts_i2c->wr_buf[1], values, length);
-	length += 1;
+	while (length > 0) {
+		client_addr = ts_i2c->client->addr | ((addr >> 8) & 0x1);
+		addr_lo = addr & 0xFF;
+		trans_len = min(length, max_xfer);
 
-	/* write data */
-	rc = i2c_master_send(ts_i2c->client, ts_i2c->wr_buf, length);
+		memset(&msg, 0, sizeof(msg));
+		msg.addr = client_addr;
+		msg.flags = 0;
+		msg.len = trans_len + 1;
+		msg.buf = ts_i2c->wr_buf;
 
-	return (rc < 0) ? rc : rc != length ? -EIO : 0;
+		ts_i2c->wr_buf[0] = addr_lo;
+		memcpy(&ts_i2c->wr_buf[1], values, trans_len);
+
+		/* write data */
+		rc = i2c_transfer(ts_i2c->client->adapter, &msg, 1);
+		if (rc != 1)
+			goto exit;
+
+		length -= trans_len;
+		values += trans_len;
+		addr += trans_len;
+	}
+
+exit:
+	return (rc < 0) ? rc : rc != 1 ? -EIO : 0;
 }
 
-static int cyttsp4_i2c_write(struct cyttsp4_adapter *adap, u8 addr,
-	const void *buf, int size)
+static int cyttsp4_i2c_write(struct cyttsp4_adapter *adap, u16 addr,
+	const void *buf, int size, int max_xfer)
 {
 	struct cyttsp4_i2c *ts = dev_get_drvdata(adap->dev);
 	int rc;
 
 	pm_runtime_get_noresume(adap->dev);
 	mutex_lock(&ts->lock);
-	rc = cyttsp4_i2c_write_block_data(ts, addr, size, buf);
+	rc = cyttsp4_i2c_write_block_data(ts, addr, size, buf, max_xfer);
 	mutex_unlock(&ts->lock);
 	pm_runtime_put_noidle(adap->dev);
 
 	return rc;
 }
 
-static int cyttsp4_i2c_read(struct cyttsp4_adapter *adap, u8 addr,
-	void *buf, int size)
+static int cyttsp4_i2c_read(struct cyttsp4_adapter *adap, u16 addr,
+	void *buf, int size, int max_xfer)
 {
 	struct cyttsp4_i2c *ts = dev_get_drvdata(adap->dev);
 	int rc;
 
 	pm_runtime_get_noresume(adap->dev);
 	mutex_lock(&ts->lock);
-	rc = cyttsp4_i2c_read_block_data(ts, addr, size, buf);
+	rc = cyttsp4_i2c_read_block_data(ts, addr, size, buf, max_xfer);
 	mutex_unlock(&ts->lock);
 	pm_runtime_put_noidle(adap->dev);
 
@@ -136,66 +176,66 @@ static int reg_set_optimum_mode_check(struct regulator *reg, int load_uA)
 static int cyttsp4_power_on(struct device *dev)
 {
 	int rc;
-    static struct regulator *vcc_ana;
-    static struct regulator *vcc_i2c;
+	static struct regulator *vcc_ana;
+	static struct regulator *vcc_i2c;
 
 	vcc_ana = regulator_get(dev, "vdd_ana");
 	if (IS_ERR(vcc_ana))
-    {
+	{
 		rc = PTR_ERR(vcc_ana);
 		dev_err(dev, "Regulator get failed vcc_ana rc=%d\n", rc);
 		return rc;
 	}
 
 	if (regulator_count_voltages(vcc_ana) > 0)
-    {
+	{
 		rc = regulator_set_voltage(vcc_ana, 2850000, 2850000);
 		if (rc)
-        {
+		{
 			dev_err(dev, "Regulator set ana vtg failed rc=%d\n", rc);
 			goto error_set_vtg_vcc_ana;
 		}
 	}
-    
-    rc = reg_set_optimum_mode_check(vcc_ana, 15000);
-    if (rc < 0)
-    {
-        dev_err(dev, "Regulator vcc_ana set_opt failed rc=%d\n", rc);
-        return rc;
-    }
-    
-    rc = regulator_enable(vcc_ana);
-    if (rc)
-    {
-        dev_err(dev, "Regulator vcc_ana enable failed rc=%d\n", rc);
-        goto error_reg_en_vcc_ana;
-    }
-    
+	
+	rc = reg_set_optimum_mode_check(vcc_ana, 15000);
+	if (rc < 0)
+	{
+		dev_err(dev, "Regulator vcc_ana set_opt failed rc=%d\n", rc);
+		return rc;
+	}
+	
+	rc = regulator_enable(vcc_ana);
+	if (rc)
+	{
+		dev_err(dev, "Regulator vcc_ana enable failed rc=%d\n", rc);
+		goto error_reg_en_vcc_ana;
+	}
+	
 	vcc_i2c = regulator_get(dev, "vcc_i2c");
 	if (IS_ERR(vcc_i2c))
-    {
+	{
 		rc = PTR_ERR(vcc_i2c);
 		dev_err(dev, "Regulator get failed rc=%d\n", rc);
 		goto error_reg_opt_vcc_dig;
 	}
 
-    rc = regulator_enable(vcc_i2c);
-    if (rc)
-    {
-        dev_err(dev, "Regulator vcc_i2c enable failed rc=%d\n", rc);
-        goto error_reg_en_vcc_i2c;
-    }
+	rc = regulator_enable(vcc_i2c);
+	if (rc)
+	{
+		dev_err(dev, "Regulator vcc_i2c enable failed rc=%d\n", rc);
+		goto error_reg_en_vcc_i2c;
+	}
 
-    msleep(100);
-    
-    return 0;
+	msleep(100);
+	
+	return 0;
 
 error_reg_en_vcc_i2c:
-    reg_set_optimum_mode_check(vcc_i2c, 0);
+	reg_set_optimum_mode_check(vcc_i2c, 0);
 error_reg_opt_vcc_dig:
-    regulator_disable(vcc_ana);
+	regulator_disable(vcc_ana);
 error_reg_en_vcc_ana:
-    reg_set_optimum_mode_check(vcc_ana, 0);
+	reg_set_optimum_mode_check(vcc_ana, 0);
 error_set_vtg_vcc_ana:
 	regulator_put(vcc_ana);
 	return rc;
@@ -203,8 +243,7 @@ error_set_vtg_vcc_ana:
 
 static int cyttsp4_parse_dt(struct device *dev)
 {
-	struct device_node *np = dev->of_node;    
-//    struct cyttsp4_core_platform_data *platform_data = dev->platform_data;
+	struct device_node *np = dev->of_node; 
     int rst_gpio = 0;
     int irq_gpio = 0;
 
@@ -247,6 +286,7 @@ static int __devinit cyttsp4_i2c_probe(struct i2c_client *client,
 		rc = -ENOMEM;
 		goto error_alloc_data_failed;
 	}
+    
 /*** ZTEMT Added by luochangyang, 2013/03/27 ***/
 #ifdef CONFIG_OF
 	if (client->dev.of_node) {

@@ -32,26 +32,25 @@
 
 #ifndef _LINUX_CYTTSP4_CORE_H
 #define _LINUX_CYTTSP4_CORE_H
-#include "cyttsp4_regs.h"//yfliu
+
+#include <linux/stringify.h>
+#include "cyttsp4_regs.h"
 
 #define CYTTSP4_CORE_NAME "cyttsp4_core"
 
-#define CYTTSP4_STR(x) #x
-#define CYTTSP4_STRINGIFY(x) CYTTSP4_STR(x)
-
 #define CY_DRIVER_NAME TTDA
 #define CY_DRIVER_MAJOR 02
-#define CY_DRIVER_MINOR 02
+#define CY_DRIVER_MINOR 03
 
-#define CY_DRIVER_REVCTRL 402597	/*00000A */
+#define CY_DRIVER_REVCTRL 467394
 
-#define CY_DRIVER_VERSION			    \
-CYTTSP4_STRINGIFY(CY_DRIVER_NAME)		    \
-"." CYTTSP4_STRINGIFY(CY_DRIVER_MAJOR)		    \
-"." CYTTSP4_STRINGIFY(CY_DRIVER_MINOR)		    \
-"." CYTTSP4_STRINGIFY(CY_DRIVER_REVCTRL)
+#define CY_DRIVER_VERSION		    \
+__stringify(CY_DRIVER_NAME)		    \
+"." __stringify(CY_DRIVER_MAJOR)	    \
+"." __stringify(CY_DRIVER_MINOR)	    \
+"." __stringify(CY_DRIVER_REVCTRL)
 
-#define CY_DRIVER_DATE "20121109"	/* YYYYMMDD */
+#define CY_DRIVER_DATE "20130429"	/* YYYYMMDD */
 
 /* x-axis resolution of panel in pixels */
 #define CY_PCFG_RESOLUTION_X_MASK 0x7F
@@ -68,6 +67,26 @@ CYTTSP4_STRINGIFY(CY_DRIVER_NAME)		    \
 #define CY_TOUCH_SETTINGS_MAX 32
 #define CY_TOUCH_SETTINGS_PARAM_REGS 6
 
+enum cyttsp4_core_platform_flags {
+	CY_CORE_FLAG_NONE = 0x00,
+	CY_CORE_FLAG_WAKE_ON_GESTURE = 0x01,
+};
+
+enum cyttsp4_core_platform_easy_wakeup_gesture {
+	CY_CORE_EWG_NONE = 0x00,
+	CY_CORE_EWG_TAP_TAP = 0x01,
+	CY_CORE_EWG_TWO_FINGER_SLIDE = 0x02,
+	CY_CORE_EWG_RESERVED = 0x03,
+	CY_CORE_EWG_WAKE_ON_INT_FROM_HOST = 0xFF,
+};
+
+enum cyttsp4_loader_platform_flags {
+	CY_LOADER_FLAG_NONE = 0x00,
+	CY_LOADER_FLAG_CALIBRATE_AFTER_FW_UPGRADE = 0x01,
+	/* Use CONFIG_VER field in TT_CFG to decide TT_CFG update */
+	CY_LOADER_FLAG_CHECK_TTCONFIG_VERSION = 0x02,
+};
+
 struct touch_settings {
 	const uint8_t   *data;
 	uint32_t         size;
@@ -81,27 +100,41 @@ struct cyttsp4_touch_firmware {
 	uint8_t vsize;
 } __packed;
 
-struct cyttsp4_loader_platform_data {
-	struct cyttsp4_touch_firmware *fw;
+struct cyttsp4_touch_config {
 	struct touch_settings *param_regs;
 	struct touch_settings *param_size;
+	const uint8_t *fw_ver;
+	uint8_t fw_vsize;
+};
+
+struct cyttsp4_loader_platform_data {
+	struct cyttsp4_touch_firmware *fw;
+	struct cyttsp4_touch_config *ttconfig;
 	u32 flags;
 } __packed;
+
+typedef int (*cyttsp4_platform_read) (struct device *dev, u16 addr,
+	void *buf, int size);
 
 struct cyttsp4_core_platform_data {
 	int irq_gpio;
 	int rst_gpio;
 	int level_irq_udelay;
+	int max_xfer_len;
 	int (*xres)(struct cyttsp4_core_platform_data *pdata,
 		struct device *dev);
 	int (*init)(struct cyttsp4_core_platform_data *pdata,
 		int on, struct device *dev);
 	int (*power)(struct cyttsp4_core_platform_data *pdata,
 		int on, struct device *dev, atomic_t *ignore_irq);
+	int (*detect)(struct cyttsp4_core_platform_data *pdata,
+		struct device *dev, cyttsp4_platform_read read);
 	int (*irq_stat)(struct cyttsp4_core_platform_data *pdata,
 		struct device *dev);
 	struct touch_settings *sett[CY_TOUCH_SETTINGS_MAX];
 	struct cyttsp4_loader_platform_data *loader_pdata;
+	u32 flags;
+	u8 easy_wakeup_gesture;
 /* ZTEMT Added by LiuYongfeng, 2012/11/19 */
 	int (*check_version)(struct cyttsp4_sysinfo *si);
 /* ZTEMT END */
