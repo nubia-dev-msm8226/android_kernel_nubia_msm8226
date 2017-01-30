@@ -12,20 +12,6 @@ menuconfig ZTEMT_TOUCHSCREEN_GT9XX
 
 if ZTEMT_TOUCHSCREEN_GT9XX
 
-choice
-	prompt "Goodix TP IC Screen Size of the Module"
-	
-config ZTEMT_GT9XX_5P0_INCH_GW_720P
-	bool "5.0 inch TP 720P"
-	help
-	  This option enables support Goodix inch TP 720P.
-
-config ZTEMT_GT9XX_5P0_INCH_GW_1080P
-	bool "5.0 inch TP 1080P"
-	help
-	  This option enables support Goodix inch TP 1080P.
-endchoice
-
 config ZTEMT_GT9XX_TOUCHSCREEN_DRIVER
 	tristate "Goodix GT9xx touchpanel driver"
 	depends on ZTEMT_TOUCHSCREEN_GT9XX

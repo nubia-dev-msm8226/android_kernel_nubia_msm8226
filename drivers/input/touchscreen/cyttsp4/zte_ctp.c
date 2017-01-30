@@ -141,7 +141,7 @@ static struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {
 #ifdef CONFIG_CYTTSP4_4P7_INCH_OTG_GW
 #define CY_MAXX 720
 #define CY_MAXY 1280
-#define CYTTSP4_FIRMEARE_VERSION    0x0611
+#define CYTTSP4_FIRMEARE_VERSION    0x060F
 #endif
 #define CY_MINX 0
 #define CY_MINY 0

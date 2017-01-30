@@ -30,10 +30,10 @@ restore=$(tput sgr0)              # Reset
 clear
 
 # Resources
-THREAD="-j12"
+THREAD="-j16"
 KERNEL="zImage"
 DTBIMAGE="dtb"
-DEFCONFIG="msm8926-nx404h_defconfig"
+DEFCONFIG="msm8926-ne501j_defconfig"
 device="nx404h"
 
 # Kernel Details

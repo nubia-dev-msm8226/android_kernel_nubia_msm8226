@@ -553,7 +553,7 @@ void debugfs_remove_recursive(struct dentry *dentry)
 			mutex_lock(&parent->d_inode->i_mutex);
 		}
 		child = list_entry(parent->d_subdirs.next, struct dentry,
-				d_u.d_child);
+				d_child);
  next_sibling:
 
 		/*
@@ -572,9 +572,9 @@ void debugfs_remove_recursive(struct dentry *dentry)
 			 * Try the next sibling.
 			 */
 			if (child->d_u.d_child.next != &parent->d_subdirs) {
-				child = list_entry(child->d_u.d_child.next,
+				child = list_entry(child->d_child.next,
 						   struct dentry,
-						   d_u.d_child);
+						   d_child);
 				goto next_sibling;
 			}
 
