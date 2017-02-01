@@ -36,6 +36,21 @@
 //--- add by duguowei,2013.12.18,for breath led
 	i2c@f9927000 { /* BLSP1 QUP5 */
 /* ZTEMT Added by LiuYongfeng, 2013/12/17 */
+/*		synaptics@20 {
+			compatible = "synaptics,rmi4";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <17 0x2008>;
+			vdd-supply = <&pm8226_l19>;
+			vcc_i2c-supply = <&pm8226_lvs1>;
+			synaptics,reset-gpio = <&msmgpio 16 0x00>;
+			synaptics,irq-gpio = <&msmgpio 17 0x2008>;
+			synaptics,button-map = <139 102 158>;
+			synaptics,i2c-pull-up;
+			synaptics,power-down;
+			synaptics,disable-gpios;
+		};*/
+
 		cyttsp4_i2c_adapter@24 {
 			compatible = "cypress,cyttsp4_i2c_adapter";
 			reg = <0x24>;
@@ -347,25 +362,27 @@
 			status = "okay";
 			qcom,led_mpp_6 {
 				label = "mpp";
-                                linux,name = "red";
+				//linux,name = "red";
+				linux,name = "msm_red";
 				linux,default-trigger = "battery-charging";
 				qcom,default-state = "off";
-				qcom,max-current = <12>;
+				qcom,max-current = <40>;
 				qcom,current-setting = <5>;
-				qcom,id = <3>;
+				qcom,id = <6>;
 				qcom,mode = "pwm";
 				qcom,pwm-us = <1000>;
 				qcom,mode-ctrl = <0x60>;
 				qcom,source-sel = <10>;
-				qcom,pwm-channel = <6>;
-				qcom,start-idx = <0>;
-			        qcom,duty-pcts= [00 02 04 06 08 0a 0c 0e 10 12
-			                 14 16 18 1a 1c 1e 20 22 24 26 
-			                 28 2a 2c 2e 30 32 34 36 38 3a 
-			                 3c 3e 40 42 44 46 48 4a 4c 4e 
-			                 50 52 54 56 58 5a 5c 5e 60 62 
-			                 64];
-				qcom,use-blink=  <1>;
+				qcom,pwm-channel = <5>;
+				qcom,start-idx = <1>;
+				qcom,ramp-step-ms = <120>;
+				qcom,duty-pcts = [00 00 00 00 00
+						  00 00 00 00 00
+						  50 00 00 00 00
+						  00 00 00 00 00
+						  00];
+				qcom,use-blink;
+				qcom,in-order-command-processing;
 			};
 		};
 	};

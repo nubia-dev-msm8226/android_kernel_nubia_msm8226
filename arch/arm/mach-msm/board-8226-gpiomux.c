@@ -365,8 +365,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 	},
 	#endif
 //--- modify by duguowei,2013.12.18
-#ifdef CONFIG_ZTEMT_CAMERA
-#else
 	{
 		.gpio      = 14,	/* BLSP1 QUP4 I2C_SDA */
 		.settings = {
@@ -374,7 +372,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
-#endif	
 	{
 		.gpio      = 15,	/* BLSP1 QUP4 I2C_SCL */
 		.settings = {
