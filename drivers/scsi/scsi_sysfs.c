@@ -1046,10 +1046,7 @@ void scsi_remove_target(struct device *dev)
 			found->reap_ref++;
 			break;
 		}
-<<<<<<< HEAD
 
-=======
->>>>>>> 3b661a9... [SCSI] fix hot unplug vs async scan race
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
