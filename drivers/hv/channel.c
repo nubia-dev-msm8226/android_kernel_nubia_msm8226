@@ -177,7 +177,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 			   GFP_KERNEL);
 	if (!open_info) {
 		err = -ENOMEM;
-		goto error_gpadl;
+		goto errorout;
 	}
 
 	init_completion(&open_info->waitevent);
@@ -193,7 +193,7 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 
 	if (userdatalen > MAX_USER_DEFINED_BYTES) {
 		err = -EINVAL;
-		goto error_gpadl;
+		goto errorout;
 	}
 
 	if (userdatalen)
