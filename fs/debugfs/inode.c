@@ -539,65 +539,19 @@ void debugfs_remove_recursive(struct dentry *dentry)
 	parent = dentry;
  down:
 	mutex_lock(&parent->d_inode->i_mutex);
-	list_for_each_entry_safe(child, next, &parent->d_subdirs, d_child) {
+	list_for_each_entry_safe(child, next, &parent->d_subdirs, d_u.d_child) {
 		if (!debugfs_positive(child))
 			continue;
 
-<<<<<<< HEAD
 		/* perhaps simple_empty(child) makes more sense */
-=======
-	while (1) {
-		/*
-		 * When all dentries under "parent" has been removed,
-		 * walk up the tree until we reach our starting point.
-		 */
-		if (list_empty(&parent->d_subdirs)) {
-			mutex_unlock(&parent->d_inode->i_mutex);
-			if (parent == dentry)
-				break;
-			parent = parent->d_parent;
-			mutex_lock(&parent->d_inode->i_mutex);
-		}
-		child = list_entry(parent->d_subdirs.next, struct dentry,
-				d_u.d_child);
- next_sibling:
-
-		/*
-		 * If "child" isn't empty, walk down the tree and
-		 * remove all its descendants first.
-		 */
->>>>>>> parent of c9a7fe5... Update to mkn
 		if (!list_empty(&child->d_subdirs)) {
 			mutex_unlock(&parent->d_inode->i_mutex);
 			parent = child;
 			goto down;
 		}
-<<<<<<< HEAD
  up:
 		if (!__debugfs_remove(child, parent))
 			simple_release_fs(&debugfs_mount, &debugfs_mount_count);
-=======
-		__debugfs_remove(child, parent);
-		if (parent->d_subdirs.next == &child->d_u.d_child) {
-			/*
-			 * Try the next sibling.
-			 */
-			if (child->d_u.d_child.next != &parent->d_subdirs) {
-				child = list_entry(child->d_u.d_child.next,
-						   struct dentry,
-						   d_u.d_child);
-				goto next_sibling;
-			}
-
-			/*
-			 * Avoid infinite loop if we fail to remove
-			 * one dentry.
-			 */
-			mutex_unlock(&parent->d_inode->i_mutex);
-			break;
-		}
-		simple_release_fs(&debugfs_mount, &debugfs_mount_count);
->>>>>>> parent of c9a7fe5... Update to mkn
 	}
 
 	mutex_unlock(&parent->d_inode->i_mutex);
@@ -606,8 +560,8 @@ void debugfs_remove_recursive(struct dentry *dentry)
 	mutex_lock(&parent->d_inode->i_mutex);
 
 	if (child != dentry) {
-		next = list_entry(child->d_child.next, struct dentry,
-					d_child);
+		next = list_entry(child->d_u.d_child.next, struct dentry,
+					d_u.d_child);
 		goto up;
 	}
 
