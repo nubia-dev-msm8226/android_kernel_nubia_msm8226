@@ -2795,11 +2795,7 @@ static ssize_t wcnss_wlan_write(struct file *fp, const char __user
 		return -EFAULT;
 
 	if ((UINT32_MAX - count < penv->user_cal_rcvd) ||
-<<<<<<< HEAD
 	     (penv->user_cal_exp_size < count + penv->user_cal_rcvd)) {
-=======
-		(penv->user_cal_exp_size < count + penv->user_cal_rcvd)) {
->>>>>>> bae1d8e... wcnss: Avoid user buffer overloading for write cal data
 		pr_err(DEVICE " invalid size to write %d\n", count +
 				penv->user_cal_rcvd);
 		rc = -ENOMEM;
