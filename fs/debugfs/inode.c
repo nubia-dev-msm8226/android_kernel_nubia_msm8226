@@ -539,7 +539,6 @@ void debugfs_remove_recursive(struct dentry *dentry)
 	parent = dentry;
  down:
 	mutex_lock(&parent->d_inode->i_mutex);
-<<<<<<< HEAD
 	list_for_each_entry_safe(child, next, &parent->d_subdirs, d_child) {
 		if (!debugfs_positive(child))
 			continue;
@@ -568,19 +567,11 @@ void debugfs_remove_recursive(struct dentry *dentry)
 		 * remove all its descendants first.
 		 */
 >>>>>>> parent of c9a7fe5... Update to mkn
-=======
-	list_for_each_entry_safe(child, next, &parent->d_subdirs, d_u.d_child) {
-		if (!debugfs_positive(child))
-			continue;
-
-		/* perhaps simple_empty(child) makes more sense */
->>>>>>> 4819d0e... debugfs: debugfs_remove_recursive() must not rely on list_empty(d_subdirs)
 		if (!list_empty(&child->d_subdirs)) {
 			mutex_unlock(&parent->d_inode->i_mutex);
 			parent = child;
 			goto down;
 		}
-<<<<<<< HEAD
 <<<<<<< HEAD
  up:
 		if (!__debugfs_remove(child, parent))
@@ -607,11 +598,6 @@ void debugfs_remove_recursive(struct dentry *dentry)
 		}
 		simple_release_fs(&debugfs_mount, &debugfs_mount_count);
 >>>>>>> parent of c9a7fe5... Update to mkn
-=======
- up:
-		if (!__debugfs_remove(child, parent))
-			simple_release_fs(&debugfs_mount, &debugfs_mount_count);
->>>>>>> 4819d0e... debugfs: debugfs_remove_recursive() must not rely on list_empty(d_subdirs)
 	}
 
 	mutex_unlock(&parent->d_inode->i_mutex);
@@ -620,13 +606,8 @@ void debugfs_remove_recursive(struct dentry *dentry)
 	mutex_lock(&parent->d_inode->i_mutex);
 
 	if (child != dentry) {
-<<<<<<< HEAD
 		next = list_entry(child->d_child.next, struct dentry,
 					d_child);
-=======
-		next = list_entry(child->d_u.d_child.next, struct dentry,
-					d_u.d_child);
->>>>>>> 4819d0e... debugfs: debugfs_remove_recursive() must not rely on list_empty(d_subdirs)
 		goto up;
 	}
 
