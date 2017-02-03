@@ -981,6 +981,14 @@ void __scsi_remove_device(struct scsi_device *sdev)
 		sdev->host->hostt->slave_destroy(sdev);
 	transport_destroy_device(dev);
 
+<<<<<<< HEAD
+=======
+	/* cause the request function to reject all I/O requests */
+	sdev->request_queue->queuedata = NULL;
+
+	/* Freeing the queue signals to block that we're done */
+	scsi_free_queue(sdev->request_queue);
+>>>>>>> parent of 9413ee2... [SCSI] Fix device removal NULL pointer dereference
 	put_device(dev);
 }
 
