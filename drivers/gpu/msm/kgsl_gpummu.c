@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
-=======
 /* Copyright (c) 2011-2013,2016, The Linux Foundation. All rights reserved.
->>>>>>> 1922978... msm: kgsl: Change %p to %pK in debug messages
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
