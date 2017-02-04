@@ -140,10 +140,6 @@ static int msm_comm_get_inst_load(struct msm_vidc_inst *inst,
 	}
 
 	if (is_non_realtime_session(inst) &&
-<<<<<<< HEAD
-		(quirks & LOAD_CALC_IGNORE_NON_REALTIME_LOAD))
-		load = msm_comm_get_mbs_per_sec(inst) / inst->prop.fps;
-=======
 		(quirks & LOAD_CALC_IGNORE_NON_REALTIME_LOAD)) {
 		if (!inst->prop.fps) {
 			dprintk(VIDC_INFO, "%s: instance:%pK prop->fps is set 0\n", __func__, inst);
@@ -151,7 +147,6 @@ static int msm_comm_get_inst_load(struct msm_vidc_inst *inst,
 		} else
 			load = msm_comm_get_mbs_per_sec(inst) / inst->prop.fps;
 	}
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
 
         return load;
 }
@@ -980,8 +975,6 @@ static void handle_sys_error(enum command_response cmd, void *data)
 	mutex_unlock(&core->lock);
 }
 
-<<<<<<< HEAD
-=======
 void msm_comm_session_clean(struct msm_vidc_inst *inst)
 {
 	int rc = 0;
@@ -1007,7 +1000,6 @@ void msm_comm_session_clean(struct msm_vidc_inst *inst)
 	mutex_unlock(&inst->lock);
 }
 
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
 static void handle_session_close(enum command_response cmd, void *data)
 {
 	struct msm_vidc_cb_cmd_done *response = data;

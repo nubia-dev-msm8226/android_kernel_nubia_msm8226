@@ -139,11 +139,7 @@ static int __init msm_sensor_init_module(void)
 		return -ENOMEM;
 	}
 
-<<<<<<< HEAD
-	pr_err("MSM_SENSOR_INIT_MODULE %p", NULL);
-=======
-	CDBG("MSM_SENSOR_INIT_MODULE %pK", NULL);
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
+	pr_err("MSM_SENSOR_INIT_MODULE %pK", NULL);
 
 	/* Initialize mutex */
 	mutex_init(&s_init->imutex);

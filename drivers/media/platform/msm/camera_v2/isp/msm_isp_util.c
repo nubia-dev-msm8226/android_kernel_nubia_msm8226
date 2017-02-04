@@ -488,8 +488,6 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	struct msm_vfe_reg_cfg_cmd *reg_cfg_cmd,
 	uint32_t *cfg_data, uint32_t cmd_len)
 {
-<<<<<<< HEAD
-=======
 	if (!vfe_dev || !reg_cfg_cmd) {
 		pr_err("%s:%d failed: vfe_dev %pK reg_cfg_cmd %pK\n", __func__,
 			__LINE__, vfe_dev, reg_cfg_cmd);
@@ -504,7 +502,6 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	}
 
 	/* Validate input parameters */
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
 	switch (reg_cfg_cmd->cmd_type) {
 	case VFE_WRITE: {
 		if (resource_size(vfe_dev->vfe_mem) <

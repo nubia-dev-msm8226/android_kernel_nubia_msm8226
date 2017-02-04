@@ -2130,15 +2130,12 @@ static void venus_hfi_core_clear_interrupt(struct venus_hfi_device *device)
 	u32 intr_status = 0;
 	int rc = 0;
 
-<<<<<<< HEAD
-=======
 	if (!device) {
 		dprintk(VIDC_ERR, "%s Invalid paramter: %pK\n",
 			__func__, device);
 		return;
 	}
 
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
 	if (!device->callback)
 		return;
 
