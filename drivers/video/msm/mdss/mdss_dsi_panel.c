@@ -509,13 +509,16 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 				panel_data);
 	mipi  = &pdata->panel_info.mipi;
 
-
+<<<<<<< HEAD
 #if defined(CONFIG_ZTEMT_NX404H_LCD) || defined(CONFIG_ZTEMT_NE501_LCD)
 	zte_ctrl_post = ctrl;
 #endif
 
 	printk("lcd:%s \n",__func__);
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
+=======
 	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+>>>>>>> 7005eb8... msm: mdss: hide kernel addresses from unprevileged users
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
@@ -574,8 +577,12 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
+<<<<<<< HEAD
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 	printk("lcd:%s \n",__func__);
+=======
 	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+>>>>>>> 7005eb8... msm: mdss: hide kernel addresses from unprevileged users
 
 	mipi  = &pdata->panel_info.mipi;
 

@@ -140,18 +140,8 @@ static int msm_comm_get_inst_load(struct msm_vidc_inst *inst,
 	}
 
 	if (is_non_realtime_session(inst) &&
-<<<<<<< HEAD
 		(quirks & LOAD_CALC_IGNORE_NON_REALTIME_LOAD))
 		load = msm_comm_get_mbs_per_sec(inst) / inst->prop.fps;
-=======
-		(quirks & LOAD_CALC_IGNORE_NON_REALTIME_LOAD)) {
-		if (!inst->prop.fps) {
-			dprintk(VIDC_INFO, "%s: instance:%pK prop->fps is set 0\n", __func__, inst);
-			load = 0;
-		} else
-			load = msm_comm_get_mbs_per_sec(inst) / inst->prop.fps;
-	}
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
 
         return load;
 }
@@ -878,24 +868,24 @@ static void handle_session_error(enum command_response cmd, void *data)
 
 	if (!inst || !inst->session || !inst->core->device) {
 		dprintk(VIDC_ERR,
-				"Session (%pK) not in a stable enough state to handle session error\n",
+				"Session (%p) not in a stable enough state to handle session error\n",
 				inst);
 		return;
 	}
 
 	hdev = inst->core->device;
-	dprintk(VIDC_WARN, "Session error received for session %pK\n", inst);
+	dprintk(VIDC_WARN, "Session error received for session %p\n", inst);
 	change_inst_state(inst, MSM_VIDC_CORE_INVALID);
 
 	if (response->status == VIDC_ERR_MAX_CLIENTS) {
 		dprintk(VIDC_WARN,
-			"send max clients reached error to client: %pK\n",
+			"send max clients reached error to client: %p\n",
 			inst);
 		msm_vidc_queue_v4l2_event(inst,
 			V4L2_EVENT_MSM_VIDC_MAX_CLIENTS);
 	} else {
 		dprintk(VIDC_ERR,
-			"send session error to client: %pK\n",
+			"send session error to client: %p\n",
 			inst);
 		msm_vidc_queue_v4l2_event(inst,
 			V4L2_EVENT_MSM_VIDC_SYS_ERROR);
@@ -980,34 +970,6 @@ static void handle_sys_error(enum command_response cmd, void *data)
 	mutex_unlock(&core->lock);
 }
 
-<<<<<<< HEAD
-=======
-void msm_comm_session_clean(struct msm_vidc_inst *inst)
-{
-	int rc = 0;
-	struct hfi_device *hdev = NULL;
-
-	if (!inst || !inst->core || !inst->core->device) {
-		dprintk(VIDC_ERR, "%s invalid params\n", __func__);
-		return;
-	}
-
-	hdev = inst->core->device;
-	mutex_lock(&inst->lock);
-	if (hdev && inst->session) {
-		dprintk(VIDC_DBG, "cleaning up instance: 0x%pK\n", inst);
-		rc = call_hfi_op(hdev, session_clean,
-				(void *) inst->session);
-		if (rc) {
-			dprintk(VIDC_ERR,
-				"Session clean failed :%pK\n", inst);
-		}
-		inst->session = NULL;
-	}
-	mutex_unlock(&inst->lock);
-}
-
->>>>>>> a1e4b70... msm: camera: Avoid exposing kernel addresses
 static void handle_session_close(enum command_response cmd, void *data)
 {
 	struct msm_vidc_cb_cmd_done *response = data;
@@ -3155,7 +3117,7 @@ void msm_comm_flush_pending_dynamic_buffers(struct msm_vidc_inst *inst)
 		if (binfo && binfo->type ==
 			V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 			dprintk(VIDC_DBG,
-				"%s: binfo = %pK device_addr = 0x%pa\n",
+				"%s: binfo = %p device_addr = 0x%pa\n",
 				__func__, binfo, &binfo->device_addr[0]);
 			buf_ref_put(inst, binfo);
 		}
@@ -3592,7 +3554,7 @@ int msm_comm_kill_session(struct msm_vidc_inst *inst)
 				msecs_to_jiffies(msm_vidc_hw_rsp_timeout));
 		if (!rc) {
 			dprintk(VIDC_ERR,
-					"%s: Wait interrupted or timed out [%pK]: %d\n",
+					"%s: Wait interrupted or timed out [%p]: %d\n",
 					__func__, inst, abort_completion);
 			msm_comm_generate_sys_error(inst);
 		} else {
@@ -3600,7 +3562,7 @@ int msm_comm_kill_session(struct msm_vidc_inst *inst)
 		}
 	} else {
 		dprintk(VIDC_WARN,
-				"Inactive session %pK, triggering an internal session error\n",
+				"Inactive session %p, triggering an internal session error\n",
 				inst);
 		msm_comm_generate_session_error(inst);
 
