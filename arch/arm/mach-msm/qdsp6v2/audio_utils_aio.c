@@ -1355,11 +1355,7 @@ long audio_aio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_lock(&audio->lock);
 		if (copy_from_user(&info, (void *)arg, sizeof(info)))
 			rc = -EFAULT;
-<<<<<<< HEAD
-		else {
-=======
 		else{
->>>>>>> 75bc2d9... ASoC: msm: lock read/write when add/free audio ion memory
 			mutex_lock(&audio->read_lock);
 			mutex_lock(&audio->write_lock);
 			rc = audio_aio_ion_add(audio, &info);
@@ -1375,21 +1371,12 @@ long audio_aio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		pr_debug("%s[%p]:AUDIO_DEREGISTER_ION\n", __func__, audio);
 		if (copy_from_user(&info, (void *)arg, sizeof(info)))
 			rc = -EFAULT;
-<<<<<<< HEAD
-		else {
-			mutex_lock(&audio->read_lock);
-			mutex_lock(&audio->write_lock);
-			rc = audio_aio_ion_remove(audio, &info);
-			mutex_unlock(&audio->write_lock);
-			mutex_unlock(&audio->read_lock);
-=======
 		else{
                         mutex_lock(&audio->read_lock);
                         mutex_lock(&audio->write_lock);
 			rc = audio_aio_ion_remove(audio, &info);
                         mutex_unlock(&audio->write_lock);
                         mutex_unlock(&audio->read_lock);
->>>>>>> 75bc2d9... ASoC: msm: lock read/write when add/free audio ion memory
 		}
 		mutex_unlock(&audio->lock);
 		break;
