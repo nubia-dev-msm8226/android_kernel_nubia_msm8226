@@ -42,14 +42,14 @@ VER="v3"
 METRO_VER="$BASE_METRO_VER$VER"
 
 # Vars
-export CROSS_COMPILE="/home/sattarhdd/my_works/kernel/arm-linux-androideabi-5.3/bin/arm-linux-androideabi-"
+export CROSS_COMPILE="/home/sattarvoybek/sattarhdd/my_works/kernel/arm-linux-androideabi-5.3/bin/arm-linux-androideabi-"
 export ARCH=arm
 export SUBARCH=arm
 export KBUILD_BUILD_USER="Sattarvoybek"
 export KBUILD_BUILD_HOST="nx404h"
 # Paths
 #STRIP=/toolchain-path/arm-eabi-strip
-STRIP=/home/sattarhdd/my_works/kernel/arm-linux-androideabi-5.3/bin/arm-linux-androideabi-strip
+STRIP=/home/sattarvoybek/sattarhdd/my_works/kernel/arm-linux-androideabi-5.3/bin/arm-linux-androideabi-strip
 KERNEL_DIR=`pwd`
 REPACK_DIR="$KERNEL_DIR/zip/kernel_zip"
 PATCH_DIR="$KERNEL_DIR/zip/kernel_zip/patch"
