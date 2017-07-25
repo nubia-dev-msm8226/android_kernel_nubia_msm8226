@@ -30,7 +30,11 @@
 			reg = <0x39>;
 			compatible = "ams,ams-sensor";
 			interrupt-parent = <&msmgpio>;
-			ams,irq-gpio = <&msmgpio 49 0x00>;		
+			ams,irq-gpio = <&msmgpio 49 0x00>;	
+
+	                //for tmd2772
+	                ams,prox-offset-cal-ability-tmd2772 = <8>;
+	                ams,prox-led-plus-cnt-tmd2772 = <12>;	
 		};
 	};
 //--- add by duguowei,2013.12.18,for breath led
