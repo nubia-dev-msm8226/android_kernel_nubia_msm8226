@@ -103,8 +103,8 @@ static struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {
 #define CYTTSP4_I2C_NAME "cyttsp4_i2c_adapter"
 #define CYTTSP4_I2C_TCH_ADR 0x24
 #define CYTTSP4_LDR_TCH_ADR 0x24
-#define CYTTSP4_I2C_IRQ_GPIO 17 /* J6.9, C19, GPMC_AD14/GPIO_38 */
-#define CYTTSP4_I2C_RST_GPIO 16 /* J6.10, D18, GPMC_AD13/GPIO_37 */
+#define CYTTSP4_I2C_IRQ_GPIO 61 /* J6.9, C19, GPMC_AD14/GPIO_38 */
+#define CYTTSP4_I2C_RST_GPIO 60 /* J6.10, D18, GPMC_AD13/GPIO_37 */
 #endif
 
 #ifdef CYTTSP4_USE_SPI
@@ -141,7 +141,7 @@ static struct cyttsp4_loader_platform_data _cyttsp4_loader_platform_data = {
 #ifdef CONFIG_CYTTSP4_4P7_INCH_OTG_GW
 #define CY_MAXX 720
 #define CY_MAXY 1280
-#define CYTTSP4_FIRMEARE_VERSION    0x0611
+#define CYTTSP4_FIRMEARE_VERSION    0x0000
 #endif
 #define CY_MINX 0
 #define CY_MINY 0
