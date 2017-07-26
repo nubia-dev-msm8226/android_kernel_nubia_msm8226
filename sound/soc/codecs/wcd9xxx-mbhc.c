@@ -96,9 +96,6 @@
 #define WCD9XXX_MEAS_INVALD_RANGE_LOW_MV 20
 #define WCD9XXX_MEAS_INVALD_RANGE_HIGH_MV 80
 
-#ifdef  CONFIG_ZTEMT_AUDIO_NX404H
-#define COMPATIBLE_HEADSET_DETECTION_GPIO 63
-#endif
 /*
  * Invalid voltage range for the detection
  * of plug type with current source
@@ -834,10 +831,6 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 	pr_debug("%s: enter insertion %d hph_status %x\n",
 		 __func__, insertion, mbhc->hph_status);
 	if (!insertion) {
-#ifdef CONFIG_ZTEMT_AUDIO_NX404H
-        gpio_direction_output(COMPATIBLE_HEADSET_DETECTION_GPIO,0);
-        pr_debug("Get Gpio .......... %d\n",gpio_get_value_cansleep(COMPATIBLE_HEADSET_DETECTION_GPIO));
-#endif
 		/* Report removal */
 		mbhc->hph_status &= ~jack_type;
 		/*
@@ -3266,16 +3259,6 @@ static void wcd9xxx_swch_irq_handler(struct wcd9xxx_mbhc *mbhc)
 		snd_soc_update_bits(codec, mbhc->mbhc_bias_regs.ctl_reg, 0x01,
 				    0x00);
 		snd_soc_update_bits(codec, WCD9XXX_A_MBHC_HPH, 0x01, 0x00);
-#ifdef CONFIG_ZTEMT_AUDIO_NX404H
-        pr_debug("GPIO start get value %d =====\n",gpio_get_value_cansleep(COMPATIBLE_HEADSET_DETECTION_GPIO));
-        /* Close the NCP for enabling the earphone */
-       // snd_soc_update_bits(codec, WCD9XXX_A_NCP_EN,0x01, 0x00);
-        gpio_direction_output(COMPATIBLE_HEADSET_DETECTION_GPIO,0);
-        msleep(50);
-        gpio_direction_output(COMPATIBLE_HEADSET_DETECTION_GPIO,1);
-        pr_debug("GPIO end get value %d==== \n",gpio_get_value_cansleep(COMPATIBLE_HEADSET_DETECTION_GPIO));
-        msleep(300);
-#endif
 		wcd9xxx_mbhc_detect_plug_type(mbhc);
 	} else if ((mbhc->current_plug != PLUG_TYPE_NONE) && !insert) {
 		mbhc->lpi_enabled = false;
@@ -5146,11 +5129,6 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 
 	wcd9xxx_regmgr_cond_register(resmgr, 1 << WCD9XXX_COND_HPH_MIC |
 					     1 << WCD9XXX_COND_HPH);
-#ifdef CONFIG_ZTEMT_AUDIO_NX404H
-    gpio_request(COMPATIBLE_HEADSET_DETECTION_GPIO, "headset");
-    gpio_direction_output(COMPATIBLE_HEADSET_DETECTION_GPIO,0);
-    pr_debug("GPIO request. COMPATIBLE_HEADSET_DETECTION_GPIO 96\n");
-#endif
 
 	pr_debug("%s: leave ret %d\n", __func__, ret);
 	return ret;
