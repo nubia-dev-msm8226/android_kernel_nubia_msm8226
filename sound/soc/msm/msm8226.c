@@ -59,7 +59,7 @@
 #define LO_1_SPK_AMP   0x1
 #define LO_2_SPK_AMP   0x2
 
-#define ADSP_STATE_READY_TIMEOUT_MS 3000
+#define ADSP_STATE_READY_TIMEOUT_MS 50
 
 static void *adsp_state_notifier;
 
@@ -83,29 +83,10 @@ void *def_tapan_mbhc_cal(void);
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 					bool dapm);
 
-
-#ifdef  CONFIG_ZTEMT_AUDIO_NX404H
-static struct wcd9xxx_mbhc_config mbhc_cfg = {
-       .read_fw_bin = false,
-       .calibration = NULL,
-       .micbias = MBHC_MICBIAS2,
-       .mclk_cb_fn = msm_snd_enable_codec_ext_clk,
-       .mclk_rate = TAPAN_EXT_CLK_RATE,
-       .gpio = 0,
-       .gpio_irq = 0,
-       .gpio_level_insert = 0,
-       .detect_extn_cable = true,
-       .micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_REGULAR_HEADSET,
-       .insert_detect = true,
-       .swap_gnd_mic = NULL,
-       .cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
-                           1 << MBHC_CS_ENABLE_INSERTION |
-                           1 << MBHC_CS_ENABLE_REMOVAL),
-};
-#else
 static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
+	.micbias = MBHC_MICBIAS2,
 	.anc_micbias = MBHC_MICBIAS2,
 	.mclk_cb_fn = msm_snd_enable_codec_ext_clk,
 	.mclk_rate = TAPAN_EXT_CLK_RATE,
@@ -125,8 +106,6 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.enable_anc_mic_detect = false,
 	.hw_jack_type = FOUR_POLE_JACK,
 };
-
-#endif 
 
 struct msm_auxpcm_gpio {
 	unsigned gpio_no;
