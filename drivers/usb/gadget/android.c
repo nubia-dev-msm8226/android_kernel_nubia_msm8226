@@ -209,14 +209,6 @@ struct android_dev {
 	char pm_qos[5];
 	struct pm_qos_request pm_qos_req_dma;
 	struct work_struct work;
-#if defined CONFIG_USB_G_LGE_ANDROID && defined CONFIG_LGE_PM
-	bool check_pif;
-#endif
-
-#ifdef CONFIG_USB_G_LGE_ANDROID
-    bool check_charge_only;
-#endif
-	char ffs_aliases[256];
 
 	/* A list of struct android_configuration */
 	struct list_head configs;
