@@ -858,10 +858,9 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      unsigned long riovcnt,
 				      unsigned long flags);
 
-<<<<<<< HEAD
+
 asmlinkage long sys_finit_module(int fd, const char __user *uargs, int flags);
-=======
->>>>>>> e8e010b... seccomp: add "seccomp" syscall
+
 asmlinkage long sys_seccomp(unsigned int op, unsigned int flags,
 			    const char __user *uargs);
 #endif
