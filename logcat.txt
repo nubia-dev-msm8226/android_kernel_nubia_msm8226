@@ -1,1 +1,0 @@
-/sbin/sh: exec: line 1: logcat: not found
