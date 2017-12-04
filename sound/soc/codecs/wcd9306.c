@@ -39,7 +39,7 @@
 #include "wcd9xxx-resmgr.h"
 #include "wcd9xxx-common.h"
 
-#define TAPAN_HPH_PA_SETTLE_COMP_ON 5000
+#define TAPAN_HPH_PA_SETTLE_COMP_ON 3000
 #define TAPAN_HPH_PA_SETTLE_COMP_OFF 13000
 
 #define DAPM_MICBIAS2_EXTERNAL_STANDALONE "MIC BIAS2 External Standalone"
@@ -2372,7 +2372,7 @@ static int tapan_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 
 		if (strnstr(w->name, internal1_text, 30))
                 {
-                #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO_NE501J)
+                #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO)
 			snd_soc_update_bits(codec, micb_int_reg, 0xE0, 0x00);
                 #else
 			snd_soc_update_bits(codec, micb_int_reg, 0xE0, 0xE0);
@@ -5370,7 +5370,7 @@ static int tapan_handle_pdata(struct tapan_priv *tapan)
 	}
 
 	/* Set micbias capless mode with tail current */
-        #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO_NE501J)
+        #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO)
 	value = (pdata->micbias.bias1_cap_mode == MICBIAS_EXT_BYP_CAP ?
 		 0x10 : 0x10);
         #else
