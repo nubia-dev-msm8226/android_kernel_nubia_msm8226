@@ -103,7 +103,7 @@
  * Invalid voltage range for the detection
  * of plug type with current source
  */
-#define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 110
+#define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 266
 #define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
 
 /*
@@ -3234,12 +3234,8 @@ static void wcd9xxx_swch_irq_handler(struct wcd9xxx_mbhc *mbhc)
 	pr_debug("%s: enter\n", __func__);
 
 	mbhc->in_swch_irq_handler = true;
-#if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO)
 	/* Wait here for debounce time */
-	usleep_range(SWCH_IRQ_DEBOUNCE_TIME_US*100, SWCH_IRQ_DEBOUNCE_TIME_US*100);
-#else
 	usleep_range(SWCH_IRQ_DEBOUNCE_TIME_US, SWCH_IRQ_DEBOUNCE_TIME_US);
-#endif
 
 	WCD9XXX_BCL_LOCK(mbhc->resmgr);
 
