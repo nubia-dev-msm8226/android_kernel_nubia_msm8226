@@ -67,7 +67,7 @@ static int spkr_drv_wrnd_param_set(const char *val,
 				   const struct kernel_param *kp);
 static int spkr_drv_wrnd = 1;
 
-int high_perf_mode = 0;
+int high_perf_mode = 1;
 
 static struct kernel_param_ops spkr_drv_wrnd_param_ops = {
 	.set = spkr_drv_wrnd_param_set,
@@ -5371,6 +5371,7 @@ static int tapan_handle_pdata(struct tapan_priv *tapan)
 
 	/* Set micbias capless mode with tail current */
         #if defined(CONFIG_ZTEMT_AUDIO_NX404H) || defined(CONFIG_ZTEMT_AUDIO)
+
 	value = (pdata->micbias.bias1_cap_mode == MICBIAS_EXT_BYP_CAP ?
 		 0x10 : 0x10);
         #else
